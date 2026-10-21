@@ -1,7 +1,8 @@
 """Gestion des clés API par fournisseur (stockage fichier + variable d'env).
 
-- Anthropic  -> apikey.txt      (var ANTHROPIC_API_KEY)
-- OpenAI     -> openai_key.txt   (var OPENAI_API_KEY, ou cfg.llm_api_key_env)
+- DeepSeek   -> deepseek_key.txt  (var DEEPSEEK_API_KEY)
+- Anthropic  -> apikey.txt        (var ANTHROPIC_API_KEY)
+- OpenAI     -> openai_key.txt    (var OPENAI_API_KEY, ou cfg.llm_api_key_env)
 - Ollama     -> aucune clé
 
 La clé n'est affichée que masquée (3 premiers + 4 derniers caractères).
@@ -12,6 +13,8 @@ import dcs_config
 
 
 def env_var(provider, cfg=None):
+    if provider == "deepseek":
+        return "DEEPSEEK_API_KEY"
     if provider == "anthropic":
         return "ANTHROPIC_API_KEY"
     if provider == "ollama":
@@ -20,6 +23,8 @@ def env_var(provider, cfg=None):
 
 
 def key_file(provider):
+    if provider == "deepseek":
+        return os.path.join(dcs_config.HERE, "deepseek_key.txt")
     if provider == "anthropic":
         return os.path.join(dcs_config.HERE, "apikey.txt")
     if provider == "ollama":
@@ -80,7 +85,7 @@ def masked(key):
 
 def needs_key(cfg):
     """True si le fournisseur courant exige une clé et qu'aucune n'est disponible."""
-    prov = cfg.get("llm_provider", "anthropic")
+    prov = cfg.get("llm_provider", "deepseek")
     if prov == "ollama":
         return False
     return not current_key(prov, cfg)

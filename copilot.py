@@ -1,5 +1,5 @@
 """
-Boucle du copilote : push-to-talk -> Whisper -> Claude (outil get_telemetry)
+Boucle du copilote : push-to-talk -> Whisper -> DeepSeek (outils DCS)
 -> voix (Piper/SAPI) + affichage DCS (gRPC) + radio (SRS).
 
 Toute la config est relue à CHAQUE tour depuis core -> réglages à la volée.
@@ -134,7 +134,7 @@ def _select_persona(cfg, ptt_pid, transcript, control, aircraft):
 def run_copilot():
     import apikeys
     cfg0 = core.get_config()
-    apikeys.load_into_env(cfg0.get("llm_provider", "anthropic"), cfg0)
+    apikeys.load_into_env(cfg0.get("llm_provider", "deepseek"), cfg0)
     # 1er démarrage : on attend qu'une clé API soit fournie via l'interface.
     warned = False
     while apikeys.needs_key(core.get_config()):
@@ -143,7 +143,7 @@ def run_copilot():
                   "(carte « Cerveau (IA) »). L'interface est déjà ouverte.")
             warned = True
         time.sleep(2)
-        apikeys.load_into_env(core.get_config().get("llm_provider", "anthropic"),
+        apikeys.load_into_env(core.get_config().get("llm_provider", "deepseek"),
                               core.get_config())
     if warned:
         print("Clé API détectée. Démarrage du copilote.")
@@ -464,7 +464,7 @@ def run_copilot():
     last_llm_key = None
     persona_monitors = {}   # id -> PTTMonitor (mode per_persona)
     mon_sig = None
-    print("\n=== Claude Copilot DCS prêt (MULTI-PERSONA, réglages à la volée) ===")
+    print("\n=== DCS AI DeepSeek prêt (MULTI-PERSONA, réglages à la volée) ===")
     print("Adresse un persona par indicatif, fréquence ou bouton PTT dédié.")
     print("Sois en vol dans DCS. Ctrl+C pour quitter.\n")
 

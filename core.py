@@ -134,7 +134,7 @@ def get_control():
 
 
 def get_llm():
-    """Client LLM live (Claude/OpenAI/Ollama), reconstruit si la config change.
+    """Client LLM live (DeepSeek/Anthropic/OpenAI/Ollama), reconstruit si la config change.
     STATE['llm_key'] change quand le fournisseur/modèle change (pour vider les
     historiques côté copilote, formats d'historique incompatibles entre adaptateurs)."""
     import llm

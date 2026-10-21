@@ -1,4 +1,4 @@
-"""Interface web de configuration du Claude Copilot DCS.
+"""Interface web de configuration du DCS AI DeepSeek.
 
 Servie par app.py EN MÊME TEMPS que le copilote (état partagé via core.py) :
 les changements s'appliquent à la volée, sans redémarrer.
@@ -26,7 +26,7 @@ STATE = core.STATE  # état partagé avec la boucle du copilote
 
 PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
-<title>Claude Copilot DCS — Configuration</title>
+<title>DCS AI DeepSeek — Configuration</title>
 <style>
  :root{--bg:#0d1117;--card:#161b22;--bd:#30363d;--fg:#e6edf3;--mut:#8b949e;
        --acc:#3fb950;--acc2:#1f6feb;--warn:#d29922}
@@ -56,7 +56,7 @@ PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
  .prow label{font-size:11px;color:var(--mut);display:flex;flex-direction:column;gap:3px}
  .prow input[type=text]{width:100px} .prow select{width:auto;padding:6px}
 </style></head><body>
-<h1>🎙️ Claude Copilot DCS — Configuration</h1>
+<h1>🎙️ DCS AI DeepSeek — Configuration</h1>
 <p class=sub>Choisis ton push-to-talk et ton micro, puis teste. Enregistré dans <kbd>config.json</kbd>.</p>
 
 <div class=card style="max-width:920px">
@@ -190,14 +190,15 @@ PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
  <h2>🧠 Cerveau (IA)</h2>
  <div class=row style=margin-top:0>
    <label>Fournisseur <select id=llmProv style=width:auto>
+     <option value=deepseek>DeepSeek</option>
      <option value=anthropic>Anthropic (Claude)</option>
      <option value=openai>OpenAI</option>
      <option value=ollama>Ollama (local)</option>
    </select></label>
-   <label>Modèle <input id=llmModel type=text style=width:200px placeholder="(défaut du fournisseur)"></label>
+   <label>Modèle <input id=llmModel type=text style=width:200px placeholder="(défaut : deepseek-chat)"></label>
  </div>
  <div class=row>
-   <label>URL API <input id=llmBase type=text style=width:300px placeholder="(défaut ; ollama: http://localhost:11434/v1)"></label>
+   <label>URL API <input id=llmBase type=text style=width:300px placeholder="(défaut : https://api.deepseek.com/v1)"></label>
  </div>
  <div class=row id=keyRow>
    <label>Clé API <input id=llmKey type=password style=width:240px placeholder="coller la clé ici"></label>
@@ -206,8 +207,9 @@ PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
  </div>
  <div class=sub style=margin-top:8px>
    Le fournisseur doit gérer le <b>tool calling</b>. La clé est stockée localement
-   (<kbd>apikey.txt</kbd> / <kbd>openai_key.txt</kbd>) et n'est jamais affichée en clair.
-   <b>Ollama</b> = 100&nbsp;% local, aucune clé. Changer de fournisseur réinitialise
+   (<kbd>deepseek_key.txt</kbd> / <kbd>apikey.txt</kbd> / <kbd>openai_key.txt</kbd>) et n'est
+   jamais affichée en clair. <b>DeepSeek</b> utilise le modèle <kbd>deepseek-chat</kbd> par
+   défaut. <b>Ollama</b> = 100&nbsp;% local, aucune clé. Changer de fournisseur réinitialise
    l'historique de conversation.
  </div>
 </div>
@@ -295,7 +297,7 @@ async function testCallsign(){
   else{m.textContent='✖ Non reconnu  (entendu : “'+(r.heard||'')+'”)';m.className='msg warn'}
 }
 function wireLlm(){
-  const p=document.getElementById('llmProv');p.value=cfg.llm_provider||'anthropic';
+  const p=document.getElementById('llmProv');p.value=cfg.llm_provider||'deepseek';
   p.onchange=()=>{cfg.llm_provider=p.value;save(true);refreshKey()};
   const m=document.getElementById('llmModel');m.value=cfg.llm_model||'';
   m.onchange=()=>{cfg.llm_model=m.value;save(true)};
@@ -304,7 +306,7 @@ function wireLlm(){
   refreshKey();
 }
 async function refreshKey(){
-  const r=await j('/api/apikey?provider='+encodeURIComponent(cfg.llm_provider||'anthropic'));
+  const r=await j('/api/apikey?provider='+encodeURIComponent(cfg.llm_provider||'deepseek'));
   const row=document.getElementById('keyRow'),m=document.getElementById('keyMsg');
   row.style.display=r.needs?'flex':'none';
   if(!r.needs){return}
@@ -316,7 +318,7 @@ async function saveKey(){
   const key=inp.value.trim();
   if(!key){m.textContent='Colle une clé.';m.className='msg';return}
   const r=await j('/api/apikey',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({provider:cfg.llm_provider||'anthropic',key})});
+    body:JSON.stringify({provider:cfg.llm_provider||'deepseek',key})});
   if(r.ok){inp.value='';m.textContent='✔ clé enregistrée : '+r.masked;m.className='msg ok'}
   else{m.textContent='⚠ '+(r.error||'échec');m.className='msg warn'}
 }
@@ -483,7 +485,7 @@ def api_roles():
 def api_get_key():
     import apikeys
     cfg = core.get_config()
-    prov = request.args.get("provider") or cfg.get("llm_provider", "anthropic")
+    prov = request.args.get("provider") or cfg.get("llm_provider", "deepseek")
     k = apikeys.current_key(prov, cfg)
     return jsonify({"provider": prov, "present": bool(k),
                     "masked": apikeys.masked(k), "needs": prov != "ollama"})
@@ -494,7 +496,7 @@ def api_set_key():
     import apikeys
     cfg = core.get_config()
     data = request.get_json(force=True) or {}
-    prov = data.get("provider") or cfg.get("llm_provider", "anthropic")
+    prov = data.get("provider") or cfg.get("llm_provider", "deepseek")
     try:
         apikeys.save_key(prov, data.get("key", ""), cfg)
         core.STATE["llm"] = None          # reconstruit le client avec la nouvelle clé
@@ -593,7 +595,7 @@ def api_test_control():
         if not cli.ping():
             return jsonify({"ok": False,
                             "error": "Pas de réponse. Es-tu EN MISSION (non en pause) ? Hook/mod installé ?"})
-        reply = cli.out_text("Claude Copilot connecté.", 10)
+        reply = cli.out_text("DCS AI DeepSeek connecté.", 10)
         # reply == "ERR: ..." révèle un souci d'exécution côté mission (diagnostic).
         if isinstance(reply, str) and reply.startswith("ERR"):
             return jsonify({"ok": False, "error": f"DCS a répondu : {reply}"})

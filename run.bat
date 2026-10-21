@@ -32,11 +32,13 @@ if defined NEEDBOOT (
   )
 )
 
-REM --- Cle API : chargee depuis apikey.txt si presente. Sinon, saisis-la dans
+REM --- Cles API : chargees depuis les fichiers si presents. Sinon, saisis-la dans
 REM l'interface (carte "Cerveau (IA)") au 1er demarrage : le copilote attend.
+if "%DEEPSEEK_API_KEY%"=="" if exist "deepseek_key.txt" set /p DEEPSEEK_API_KEY=<deepseek_key.txt
 if "%ANTHROPIC_API_KEY%"=="" if exist "apikey.txt" set /p ANTHROPIC_API_KEY=<apikey.txt
+if "%OPENAI_API_KEY%"=="" if exist "openai_key.txt" set /p OPENAI_API_KEY=<openai_key.txt
 
-echo Lancement du Claude Copilot DCS (interface + copilote)...
+echo Lancement du DCS AI DeepSeek (interface + copilote)...
 "%~dp0python\python.exe" "%~dp0app.py"
 echo.
 pause

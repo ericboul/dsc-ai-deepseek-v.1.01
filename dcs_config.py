@@ -35,7 +35,7 @@ SPOKEN_LANGUAGES = [
     {"code": "ko", "label": "한국어"},
     {"code": "vi", "label": "Tiếng Việt"},
 ]
-# Nom de langue injecté dans le prompt (pour la langue des réponses de Claude).
+# Nom de langue injecté dans le prompt (pour la langue des réponses de l'IA).
 LANG_NAMES = {l["code"]: l["label"] for l in SPOKEN_LANGUAGES}
 
 DEFAULTS = {
@@ -49,12 +49,12 @@ DEFAULTS = {
     "whisper_device": "cpu",     # "cpu" ou "cuda"
     "whisper_compute": "int8",   # "int8" (cpu) ou "float16" (gpu)
     "language": "fr",
-    # Cerveau (LLM) — interchangeable
-    "llm_provider": "anthropic",   # "anthropic" | "openai" | "ollama"
-    "llm_model": "",               # vide = défaut du fournisseur
-    "llm_base_url": "",            # vide = défaut (ollama: http://localhost:11434/v1)
+    # Cerveau (LLM) — DeepSeek par défaut
+    "llm_provider": "deepseek",   # "deepseek" | "anthropic" | "openai" | "ollama"
+    "llm_model": "",              # vide = défaut du fournisseur (deepseek-chat)
+    "llm_base_url": "",           # vide = défaut (deepseek: https://api.deepseek.com/v1)
     "llm_api_key_env": "OPENAI_API_KEY",  # variable d'env de la clé (openai/custom)
-    "claude_model": "claude-sonnet-4-6",  # modèle Anthropic par défaut
+    "claude_model": "claude-sonnet-4-6",  # modèle Anthropic par défaut (optionnel)
     # Moteur de synthèse : "piper" (neuronal local) ou "sapi" (voix Windows)
     "tts_engine": "piper",
     "piper_exe_path": os.path.join(HERE, "piper", "piper", "piper.exe"),
@@ -76,7 +76,7 @@ DEFAULTS = {
     "srs_voice": "",
     # Canal de commande vers DCS (hook Lua ; "none" pour désactiver)
     "control_backend": "hook",
-    "display_responses": True,   # afficher les réponses de Claude à l'écran DCS
+    "display_responses": True,   # afficher les réponses de l'IA à l'écran DCS
     "control_host": "127.0.0.1",
     "control_port": 5011,        # port du hook Lua
     # Multi-persona : plusieurs opérateurs, chacun sa voix/langue/fréquence/rôle.

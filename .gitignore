@@ -1,0 +1,15 @@
+# Secrets et configuration locale
+deepseek_key.txt
+apikey.txt
+openai_key.txt
+config.json
+
+# Composants telecharges au premier lancement
+python/
+libs/
+piper/
+models/
+
+# Caches
+__pycache__/
+*.pyc

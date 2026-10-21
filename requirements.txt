@@ -1,4 +1,5 @@
-anthropic>=0.40
+# DeepSeek passe par httpx (API compatible OpenAI).
+anthropic>=0.40  # optionnel : uniquement si tu choisis le fournisseur Anthropic
 httpx>=0.27
 faster-whisper>=1.0
 sounddevice>=0.4

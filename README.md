@@ -1,15 +1,15 @@
 <div align="center">
 
-# 🎙️ Claude Copilot for DCS
+# 🎙️ DCS AI DeepSeek
 
 **Un copilote vocal intelligent pour [DCS World](https://www.digitalcombatsimulator.com/) —
 parle à ton équipage, il agit dans la mission.**
 
-*Reconnaissance vocale locale · IA à outils (Claude / OpenAI / Ollama) · voix neuronale ·
+*Reconnaissance vocale locale · IA à outils (DeepSeek par défaut, OpenAI / Ollama) · voix neuronale ·
 multi-personas (opérateur, AWACS, ailier) · spawn & contrôle en jeu — le tout sans mod lourd
 ni modification de `MissionScripting.lua`.*
 
-**par Snurpsss & Claude**
+**Version DeepSeek 1.01 — basée sur le projet original de Snurpsss & Claude**
 
 📖 **[Guide détaillé →](GUIDE.md)** · [Installation](#-installation) · [Fonctionnalités](#-fonctionnalités)
 
@@ -26,12 +26,12 @@ chacun avec sa **voix**, son **indicatif**, sa **langue** et son **rôle** — a
 
 Tout ce qui peut l'être tourne **en local** : la reconnaissance vocale (Whisper) et la synthèse
 (Piper) sont sur ta machine ; seul le « cerveau » (le LLM) est appelé via une API — et il est
-**interchangeable** (Claude, OpenAI, ou **Ollama** 100 % hors-ligne).
+**interchangeable** (**DeepSeek** par défaut, OpenAI, Anthropic, ou **Ollama** 100 % hors-ligne).
 
 ```mermaid
 flowchart LR
     PTT["🎙️ Push-to-talk"] --> STT["Whisper<br/>(STT local)"]
-    STT --> LLM["🧠 LLM + outils<br/>(Claude / OpenAI / Ollama)"]
+    STT --> LLM["🧠 LLM + outils<br/>(DeepSeek / OpenAI / Ollama)"]
     LLM -->|"outils : spawn, marquage,<br/>télémétrie, encadrement…"| HOOK["Hook Lua"]
     HOOK --> DCS[("DCS World")]
     DCS -. "Export.lua (UDP)" .-> LLM
@@ -54,7 +54,7 @@ flowchart LR
 | **Affichage** | Les réponses s'affichent aussi **à l'écran** dans DCS |
 | **Multi-personas** | Plusieurs opérateurs simultanés — **voix + indicatif + langue + fréquence** propres ; adressage par **indicatif**, **bouton PTT dédié** ou **fréquence radio** (F/A‑18C) |
 | **Voix** | Piper (neuronal, local, multilingue — catalogue téléchargeable) ou SAPI ; sortie vers ton casque, ou **radio en jeu via DCS‑SRS** |
-| **Cerveau interchangeable** | Anthropic (Claude), OpenAI, ou **Ollama** (local) — un réglage suffit |
+| **Cerveau interchangeable** | **DeepSeek** (défaut), Anthropic (Claude), OpenAI, ou **Ollama** (local) — un réglage suffit |
 
 ---
 
@@ -62,7 +62,7 @@ flowchart LR
 
 - **Windows** + **DCS World**
 - Un **microphone** (casque VR OK)
-- Une **clé API** d'un fournisseur d'IA (Anthropic par défaut, ou OpenAI) — **ou** [Ollama](https://ollama.com) pour du 100 % local
+- Une **clé API DeepSeek** (par défaut) — crée-la sur [platform.deepseek.com](https://platform.deepseek.com/) — **ou** une clé OpenAI/Anthropic, **ou** [Ollama](https://ollama.com) pour du 100 % local
 - Une connexion internet **au premier démarrage** (téléchargement automatique des composants)
 
 > Pas besoin de Python installé ni de toucher à `MissionScripting.lua`.
@@ -72,7 +72,7 @@ flowchart LR
 ## 📥 Installation
 
 ### 1. Récupérer le projet
-Télécharge/clone ce dépôt dans un dossier, par ex. `D:\DCSClaude`.
+Télécharge/clone ce dépôt dans un dossier, par ex. `D:\DCS-DeepSeek`.
 
 ### 2. Côté DCS (une fois)
 **a. Télémétrie** — copie `dcs_claude_export.lua` dans :
@@ -98,8 +98,10 @@ tout ce qu'il faut (Python embarqué, librairies, Piper + une voix) — compte q
 L'interface web s'ouvre ensuite toute seule.
 
 ### 4. Clé API
-Dans l'interface, carte **« Cerveau (IA) »**, colle ta clé API (stockée localement, affichée masquée).
-Tant qu'aucune clé n'est fournie, le copilote **attend**. *(Ollama ne demande pas de clé.)*
+Dans l'interface, carte **« Cerveau (IA) »**, choisis **DeepSeek** et colle ta clé API
+(stockée localement dans `deepseek_key.txt`, affichée masquée). Le modèle par défaut est
+`deepseek-chat`. Tant qu'aucune clé n'est fournie, le copilote **attend**.
+*(Ollama ne demande pas de clé.)*
 
 ### 5. En vol
 Ouvre une mission, prends les commandes d'un avion, **maintiens ton push‑to‑talk** et parle.
@@ -134,7 +136,7 @@ Chaque persona répond avec **sa** voix et **sa** langue. Adresse-le par son **i
 - **Langue parlée** & **modèle** Whisper (`base`/`small`/`medium`…).
 - **Voix (TTS)** : moteur Piper/SAPI, **catalogue de voix téléchargeable** (54 langues), sortie casque.
 - **Radio en jeu (DCS‑SRS)** : optionnel, pour entendre le copilote sur une fréquence.
-- **Cerveau (IA)** : fournisseur (Claude/OpenAI/Ollama), modèle, clé API.
+- **Cerveau (IA)** : fournisseur (DeepSeek/OpenAI/Anthropic/Ollama), modèle, URL API, clé API.
 
 ### 🔄 Réinitialiser / alléger
 `reset.bat` ramène le dossier à son **état minimal** (supprime clé, config, voix, librairies, Python,
@@ -147,7 +149,7 @@ un dossier léger.
 
 - **STT** : [faster‑whisper](https://github.com/SYSTRAN/faster-whisper) (local, multilingue)
 - **TTS** : [Piper](https://github.com/rhasspy/piper) (neuronal, local) ou SAPI Windows
-- **IA** : SDK [Anthropic](https://www.anthropic.com/) / API OpenAI‑compatible (OpenAI, [Ollama](https://ollama.com))
+- **IA** : API [DeepSeek](https://platform.deepseek.com/) (compatible OpenAI) / API OpenAI‑compatible (OpenAI, [Ollama](https://ollama.com)) / SDK [Anthropic](https://www.anthropic.com/) en option
 - **Pont DCS** : `Export.lua` (télémétrie UDP) + hook Lua (`net.dostring_in` → `a_do_script`) pour agir dans la mission
 - **Interface** : Flask (page web locale), config à chaud partagée
 - **Entrées** : PTT clavier + HOTAS/joystick (SDL/pygame)
@@ -168,7 +170,9 @@ un dossier léger.
 
 ## 🙌 Crédits
 
-Projet **Snurpsss & Claude**.
+Projet original **Claude Copilot for DCS** par **Snurpsss & Claude**.
+Version **DCS AI DeepSeek 1.01** : adaptation de l'application au modèle **DeepSeek**
+(`deepseek-chat`) via l'API compatible OpenAI.
 
 Inspiré par la communauté DCS et par des outils tiers comme
 [DCS‑SRS](https://github.com/ciribob/DCS-SimpleRadio-Standalone),

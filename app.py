@@ -1,5 +1,5 @@
 """
-Point d'entrée UNIQUE du Claude Copilot DCS.
+Point d'entrée UNIQUE du DCS AI DeepSeek.
 
 Lance en même temps :
   - l'interface web de configuration (http://127.0.0.1:5001), et
@@ -31,7 +31,7 @@ def main():
     # Charge la clé API du fournisseur courant (fichier -> variable d'env).
     import apikeys
     _cfg = core.get_config()
-    apikeys.load_into_env(_cfg.get("llm_provider", "anthropic"), _cfg)
+    apikeys.load_into_env(_cfg.get("llm_provider", "deepseek"), _cfg)
     # Interface web en tâche de fond.
     threading.Thread(target=_serve, daemon=True).start()
     # Précharge Whisper (pas d'attente au 1er test / 1re phrase).

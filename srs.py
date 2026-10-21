@@ -1,9 +1,9 @@
-"""Transmission de la voix de Claude PAR LA RADIO DCS via DCS-SRS.
+"""Transmission de la voix de l'IA PAR LA RADIO DCS via DCS-SRS.
 
 Utilise DCS-SRS-ExternalAudio.exe (fourni avec DCS-SRS) : on lui passe le texte
 et une fréquence ; il synthétise un TTS et le transmet sur le réseau SRS. En jeu,
 avec le client SRS connecté et la radio réglée sur cette fréquence, tu entends
-Claude sur la radio.
+le copilote sur la radio.
 
 Prérequis côté joueur :
   - DCS-SRS installé,
@@ -30,7 +30,7 @@ def build_args(cfg, text):
         "-p", str(cfg.get("srs_port", 5002)),          # port serveur SRS
         "-i", cfg.get("srs_ip", "127.0.0.1"),
         "-v", "1.0",
-        "-n", "Claude",
+        "-n", "DeepSeek",
     ]
     if cfg.get("srs_culture"):
         args += ["--culture", cfg["srs_culture"]]      # ex. fr-FR

@@ -1,4 +1,4 @@
-# 📖 Guide détaillé — Claude Copilot for DCS
+# 📖 Guide détaillé — DCS AI DeepSeek
 
 Documentation complète (installation, interface, capacités, dépannage).
 Pour la présentation, voir le [README](README.md).
@@ -53,10 +53,11 @@ Double-clique **`run.bat`**.
 - **1er lancement** : téléchargement + installation automatiques (Python, librairies, Piper + une
   voix). Compte quelques minutes et une connexion internet. Les lancements suivants sont immédiats.
 - L'**interface web** s'ouvre seule (`http://127.0.0.1:5001`) **et** le copilote démarre.
-- **Clé API** : dans la carte **« Cerveau (IA) »**, colle ta clé. Elle est stockée localement
-  (`apikey.txt` pour Anthropic, `openai_key.txt` pour OpenAI) et **affichée masquée** (`sk-…1234`).
-  Tant qu'aucune clé n'est fournie, le copilote **attend** (l'interface reste utilisable). *Ollama :
-  aucune clé.*
+- **Clé API** : dans la carte **« Cerveau (IA) »**, choisis **DeepSeek** et colle ta clé
+  (créée sur [platform.deepseek.com](https://platform.deepseek.com/)). Elle est stockée localement
+  (`deepseek_key.txt` pour DeepSeek, `apikey.txt` pour Anthropic, `openai_key.txt` pour OpenAI) et
+  **affichée masquée** (`sk-…1234`). Tant qu'aucune clé n'est fournie, le copilote **attend**
+  (l'interface reste utilisable). *Ollama : aucune clé.*
 - En vol, prends les commandes d'un avion, **maintiens le push-to-talk** et parle.
 
 ---
@@ -75,7 +76,7 @@ redémarrage). Les cartes :
 | **Sortie voix (TTS)** | Moteur **Piper**/SAPI, **voix Piper**, **téléchargement de voix** (catalogue Langue → Voix, 54 langues), **périphérique de sortie** (ton casque), bouton **« Tester la voix »**. |
 | **Radio en jeu (DCS-SRS)** | Optionnel : entendre le copilote **sur une fréquence** via `DCS-SRS-ExternalAudio.exe`. |
 | **Affichage / actions en jeu** | Bouton **« Tester »** (envoie un message à l'écran DCS). Requiert le hook + une mission. |
-| **Cerveau (IA)** | Fournisseur (Claude/OpenAI/Ollama), modèle, URL API, **clé API**. |
+| **Cerveau (IA)** | Fournisseur (DeepSeek/Anthropic/OpenAI/Ollama), modèle, URL API, **clé API**. |
 
 ---
 
@@ -122,11 +123,19 @@ La **phrase de test** est prononcée dans la langue de la voix sélectionnée.
 
 Le « cerveau » (décisions + appels d'outils) est **interchangeable** (carte « Cerveau (IA) ») :
 
-| Fournisseur | Clé / URL | Exemple de modèle |
+| Fournisseur | Clé / URL | Modèle par défaut |
 |---|---|---|
+| **DeepSeek** (recommandé) | `DEEPSEEK_API_KEY` · `https://api.deepseek.com/v1` | `deepseek-chat` |
 | **Anthropic (Claude)** | `ANTHROPIC_API_KEY` | `claude-sonnet-4-6` |
 | **OpenAI** | `OPENAI_API_KEY` | `gpt-4o-mini` |
 | **Ollama (local)** | URL `http://localhost:11434/v1`, aucune clé | `llama3.1` |
+
+**DeepSeek en détail** : crée une clé sur [platform.deepseek.com](https://platform.deepseek.com/),
+puis colle-la dans la carte « Cerveau (IA) » (fournisseur **DeepSeek**). Laisse les champs
+**Modèle** et **URL API** vides pour utiliser `deepseek-chat` et
+`https://api.deepseek.com/v1`. La clé est conservée dans `deepseek_key.txt` (ou la variable
+d'environnement `DEEPSEEK_API_KEY`). `deepseek-chat` gère le **tool calling** utilisé par le
+copilote.
 
 Prérequis : le modèle doit gérer le **tool calling**. Whisper (STT) et Piper (TTS) restent locaux et
 indépendants du fournisseur. Changer de fournisseur réinitialise l'historique de conversation.
@@ -207,7 +216,7 @@ app.py                                   point d'entrée (interface + copilote)
 core.py                                  état partagé, config à chaud, services
 copilot.py                               boucle : PTT → STT → LLM+outils → voix
 personas.py                              rôles, prompts, routage d'adressage
-llm.py                                   adaptateurs LLM (Anthropic / OpenAI-compatible)
+llm.py                                   adaptateurs LLM (DeepSeek / OpenAI-compatible / Anthropic)
 apikeys.py                               gestion des clés (fichier + masquage)
 tts.py / audioio.py / ptt.py             voix / audio / push-to-talk
 dcs_control.py                           client hook : spawn, marquage, statiques, télémétrie
@@ -224,4 +233,5 @@ mission) → réponse → **Piper/SAPI** (voix) / affichage écran. La télémé
 
 ---
 
-*Projet **Snurpsss & Claude**. Non affilié à Eagle Dynamics.*
+*Projet original **Claude Copilot for DCS** par **Snurpsss & Claude**.
+Version **DCS AI DeepSeek 1.01** — non affiliée à Eagle Dynamics ni à DeepSeek.*

@@ -3,10 +3,10 @@ setlocal
 cd /d "%~dp0"
 
 echo ============================================================
-echo  REINITIALISATION du Claude Copilot DCS
+echo  REINITIALISATION du DCS AI DeepSeek
 echo  Ramene le dossier a son etat minimal (juste les scripts).
 echo  Seront SUPPRIMES (tout est re-telecharge au prochain run.bat) :
-echo    - Cle(s) API        : apikey.txt, openai_key.txt
+echo    - Cle(s) API        : deepseek_key.txt, apikey.txt, openai_key.txt
 echo    - Configuration     : config.json
 echo    - Python embarque   : python\
 echo    - Librairies Python : libs\
@@ -17,6 +17,7 @@ echo ============================================================
 choice /M "Confirmer la reinitialisation"
 if errorlevel 2 goto :end
 
+del /q "deepseek_key.txt" 2>nul
 del /q "apikey.txt" 2>nul
 del /q "openai_key.txt" 2>nul
 del /q "config.json" 2>nul

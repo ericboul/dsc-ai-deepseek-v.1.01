@@ -5,9 +5,10 @@ Un adaptateur expose UNE méthode :
 qui gère toute la boucle d'appels d'outils en interne et renvoie le texte final +
 l'historique (opaque, propre à l'adaptateur) à re-passer au tour suivant.
 
-Adaptateurs : Anthropic (Claude) et OpenAI-compatible (OpenAI, Ollama local,
-Mistral, tout endpoint /v1/chat/completions). `tools` = liste au format Anthropic
-(name / description / input_schema) ; convertie au vol pour OpenAI.
+Adaptateurs : DeepSeek (par défaut), OpenAI-compatible (OpenAI, Ollama local,
+Mistral, tout endpoint /v1/chat/completions) et Anthropic (optionnel).
+`tools` = liste au format Anthropic (name / description / input_schema) ;
+convertie au vol pour l'API OpenAI-compatible.
 """
 import json
 import os
@@ -42,7 +43,7 @@ class AnthropicClient:
 
 
 class OpenAICompatClient:
-    """OpenAI, Ollama (local), Mistral… — tout endpoint /v1/chat/completions."""
+    """DeepSeek, OpenAI, Ollama (local), Mistral… — endpoint /chat/completions."""
     def __init__(self, model, base_url, api_key="", max_tokens=400):
         self.model = model
         self.base = base_url.rstrip("/")
@@ -90,16 +91,22 @@ class OpenAICompatClient:
 
 def client_key(cfg):
     """Identité du client (pour détecter un changement de fournisseur/modèle)."""
-    return (cfg.get("llm_provider", "anthropic"),
+    return (cfg.get("llm_provider", "deepseek"),
             cfg.get("llm_model", ""), cfg.get("llm_base_url", ""),
             cfg.get("claude_model", ""))
 
 
 def make_client(cfg):
-    prov = cfg.get("llm_provider", "anthropic")
+    prov = (cfg.get("llm_provider") or "deepseek").lower()
     if prov == "anthropic":
         model = cfg.get("llm_model") or cfg.get("claude_model") or "claude-sonnet-4-6"
         return AnthropicClient(model)
+    if prov == "deepseek":
+        # API compatible OpenAI. Clé lue depuis DEEPSEEK_API_KEY (apikeys.py).
+        base = cfg.get("llm_base_url") or "https://api.deepseek.com/v1"
+        model = cfg.get("llm_model") or "deepseek-chat"
+        key = os.environ.get("DEEPSEEK_API_KEY", "")
+        return OpenAICompatClient(model, base, key)
     if prov == "ollama":
         base = cfg.get("llm_base_url") or "http://localhost:11434/v1"
         model = cfg.get("llm_model") or "llama3.1"
