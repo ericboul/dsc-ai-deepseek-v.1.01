@@ -3,7 +3,7 @@ setlocal
 cd /d "%~dp0"
 
 echo ============================================================
-echo  REINITIALISATION du DCS AI DeepSeek
+echo  REINITIALISATION du DCS RYZEN Copilote
 echo  Ramene le dossier a son etat minimal (juste les scripts).
 echo  Seront SUPPRIMES (tout est re-telecharge au prochain run.bat) :
 echo    - Cle(s) API        : deepseek_key.txt, apikey.txt, openai_key.txt

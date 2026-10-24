@@ -21,6 +21,7 @@ STATE = {
     "speaker": None, "speaker_key": None,
     "speak_lock": threading.Lock(),
     "control": None, "control_key": None,
+    "status": {"heard": "", "error": "", "rms": 0.0},
 }
 STATE["monitor"] = ptt.PTTMonitor(STATE["config"].get("ptt"))
 

@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#16233a"/>
+      <stop offset="1" stop-color="#070c15"/>
+    </linearGradient>
+    <linearGradient id="helmet" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#f2f6fb"/>
+      <stop offset="0.55" stop-color="#d3dde9"/>
+      <stop offset="1" stop-color="#9aabbd"/>
+    </linearGradient>
+    <linearGradient id="visor2" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0" stop-color="#12314a"/>
+      <stop offset="0.45" stop-color="#0a1b2b"/>
+      <stop offset="1" stop-color="#050d16"/>
+    </linearGradient>
+    <linearGradient id="mask" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e2e9f1"/>
+      <stop offset="1" stop-color="#aebbcb"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#2f81f7" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#2f81f7" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="domeClip">
+      <path d="M300 585 L300 470 C300 328 396 248 512 248 C628 248 724 328 724 470 L724 585
+               C724 648 656 700 512 700 C368 700 300 648 300 585 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- tuile -->
+  <rect x="0" y="0" width="1024" height="1024" rx="208" fill="url(#bg)"/>
+  <rect x="6" y="6" width="1012" height="1012" rx="202" fill="none" stroke="#25405e" stroke-width="6"/>
+
+  <!-- halo -->
+  <circle cx="512" cy="500" r="360" fill="url(#glow)"/>
+
+  <!-- tuyau d'oxygène -->
+  <path d="M414 700 C384 758 318 776 268 814" fill="none" stroke="#0a0f18" stroke-width="46" stroke-linecap="round"/>
+  <path d="M414 700 C384 758 318 776 268 814" fill="none" stroke="#93a3b5" stroke-width="30" stroke-linecap="round"/>
+  <circle cx="264" cy="816" r="30" fill="#cfd9e4" stroke="#0a0f18" stroke-width="10"/>
+
+  <!-- pods latéraux -->
+  <circle cx="300" cy="520" r="56" fill="#b9c6d5" stroke="#0a0f18" stroke-width="12"/>
+  <circle cx="724" cy="520" r="56" fill="#b9c6d5" stroke="#0a0f18" stroke-width="12"/>
+  <circle cx="300" cy="520" r="17" fill="#4cc9f0"/>
+  <circle cx="724" cy="520" r="17" fill="#4cc9f0"/>
+
+  <!-- coque -->
+  <path d="M300 585 L300 470 C300 328 396 248 512 248 C628 248 724 328 724 470 L724 585
+           C724 648 656 700 512 700 C368 700 300 648 300 585 Z"
+        fill="url(#helmet)" stroke="#0a0f18" stroke-width="14" stroke-linejoin="round"/>
+
+  <!-- ombre du côté droit + reflet -->
+  <g clip-path="url(#domeClip)">
+    <path d="M560 230 L760 230 L760 720 L560 720 C640 640 620 420 560 230 Z" fill="#8fa1b4" opacity="0.35"/>
+    <ellipse cx="430" cy="330" rx="120" ry="60" fill="#ffffff" opacity="0.35"/>
+  </g>
+
+  <!-- bandeau frontal du casque -->
+  <path d="M324 382 C376 336 442 314 512 314 C582 314 648 336 700 382"
+        fill="none" stroke="#0a0f18" stroke-width="52" stroke-linecap="round"/>
+  <path d="M324 382 C376 336 442 314 512 314 C582 314 648 336 700 382"
+        fill="none" stroke="#dfe8f2" stroke-width="36" stroke-linecap="round"/>
+  <path d="M336 372 C386 334 446 318 512 318 C578 318 638 334 688 372"
+        fill="none" stroke="#ffffff" stroke-width="8" stroke-linecap="round" opacity="0.5"/>
+
+  <!-- visière -->
+  <path d="M338 470 C338 398 418 356 512 356 C606 356 686 398 686 470
+           C686 542 618 592 512 592 C406 592 338 542 338 470 Z"
+        fill="url(#visor2)" stroke="#0a0f18" stroke-width="14"/>
+  <!-- reflets -->
+  <path d="M364 486 C374 414 438 386 500 384 C432 402 392 442 380 500 Z"
+        fill="#7fe3ff" opacity="0.65"/>
+  <path d="M604 400 C650 414 672 448 672 486 C664 452 640 424 604 400 Z"
+        fill="#4cc9f0" opacity="0.35"/>
+  <path d="M352 500 C356 546 402 574 470 580" fill="none" stroke="#4cc9f0"
+        stroke-width="6" opacity="0.55" stroke-linecap="round"/>
+
+  <!-- sangles du masque -->
+  <path d="M372 596 L318 566" stroke="#0a0f18" stroke-width="26" stroke-linecap="round"/>
+  <path d="M372 596 L318 566" stroke="#93a3b5" stroke-width="14" stroke-linecap="round"/>
+  <path d="M652 596 L706 566" stroke="#0a0f18" stroke-width="26" stroke-linecap="round"/>
+  <path d="M652 596 L706 566" stroke="#93a3b5" stroke-width="14" stroke-linecap="round"/>
+
+  <!-- masque à oxygène -->
+  <path d="M400 552 H624 C644 552 660 568 660 588 V616
+           C660 674 612 704 512 704 C412 704 364 674 364 616 V588
+           C364 568 380 552 400 552 Z"
+        fill="url(#mask)" stroke="#0a0f18" stroke-width="14" stroke-linejoin="round"/>
+  <path d="M386 594 H638" stroke="#8d9cae" stroke-width="7" stroke-linecap="round"/>
+  <rect x="458" y="608" width="14" height="52" rx="7" fill="#26333f"/>
+  <rect x="505" y="608" width="14" height="52" rx="7" fill="#26333f"/>
+  <rect x="552" y="608" width="14" height="52" rx="7" fill="#26333f"/>
+
+  <!-- accents cyan sur la coque -->
+  <path d="M318 590 C318 640 366 676 430 690" fill="none" stroke="#4cc9f0"
+        stroke-width="7" opacity="0.75" stroke-linecap="round"/>
+</svg>

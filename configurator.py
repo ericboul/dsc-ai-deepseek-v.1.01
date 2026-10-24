@@ -1,4 +1,4 @@
-"""Interface web de configuration du DCS AI DeepSeek.
+"""Interface web de configuration du DCS RYZEN Copilote.
 
 Servie par app.py EN MÊME TEMPS que le copilote (état partagé via core.py) :
 les changements s'appliquent à la volée, sans redémarrer.
@@ -9,7 +9,7 @@ os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
 
 import numpy as np
 import sounddevice as sd
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_file
 
 import dcs_config
 import ptt
@@ -24,9 +24,18 @@ app = Flask(__name__)
 STATE = core.STATE  # état partagé avec la boucle du copilote
 
 
+@app.get("/favicon.ico")
+def favicon():
+    """Petit casque de pilote dans l'onglet du navigateur."""
+    p = os.path.join(dcs_config.HERE, "eb_logo.ico")
+    if os.path.exists(p):
+        return send_file(p, mimetype="image/x-icon")
+    return ("", 404)
+
+
 PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1">
-<title>DCS AI DeepSeek — Configuration</title>
+<title>DCS RYZEN Copilote — Configuration</title>
 <style>
  :root{--bg:#0d1117;--card:#161b22;--bd:#30363d;--fg:#e6edf3;--mut:#8b949e;
        --acc:#3fb950;--acc2:#1f6feb;--warn:#d29922}
@@ -56,7 +65,7 @@ PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
  .prow label{font-size:11px;color:var(--mut);display:flex;flex-direction:column;gap:3px}
  .prow input[type=text]{width:100px} .prow select{width:auto;padding:6px}
 </style></head><body>
-<h1>🎙️ DCS AI DeepSeek — Configuration</h1>
+<h1>🎙️ DCS RYZEN Copilote — Configuration</h1>
 <p class=sub>Choisis ton push-to-talk et ton micro, puis teste. Enregistré dans <kbd>config.json</kbd>.</p>
 
 <div class=card style="max-width:920px">
@@ -105,6 +114,7 @@ PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
    <button class=ghost onclick=testMic()>🎧 Tester le micro (parle 4 s)</button>
    <span id=micMsg class=msg></span>
  </div>
+ <div class="sub" id=listenStatus style="margin-top:8px">En attente de ta voix…</div>
  <div class=sub style=margin-top:8px>Le périphérique d'entrée utilisé pour t'écouter.</div>
 </div>
 
@@ -186,6 +196,30 @@ PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
  </div>
 </div>
 
+<div class=card style="max-width:920px">
+ <h2>✈️ Commandes de l'avion &amp; carré des touches</h2>
+ <div class=sub id=cmdInfo>Recherche du catalogue de commandes…</div>
+ <div class=row>
+   <input id=cmdQ type=text placeholder="ex : train d'atterrissage, volets, master arm, maintien altitude" style="flex:1;min-width:260px;padding:8px;border-radius:6px;border:1px solid var(--bd);background:#0d1117;color:var(--fg)">
+   <button class=ghost onclick=cmdSearch()>🔎 Chercher</button>
+   <button class=ghost onclick=cmdAction('show')>⬜ Afficher la touche</button>
+   <button onclick=cmdAction('press')>▶ Exécuter</button>
+   <span id=cmdMsg class=msg></span>
+ </div>
+ <div class=row>
+   <label><input type=checkbox id=cmdInject onchange="cmdOpt('key_injection',this.checked)"> Le copilote peut appuyer sur les touches</label>
+   <label><input type=checkbox id=cmdOverlay onchange="cmdOpt('key_overlay',this.checked)"> Carré de la touche à l'écran</label>
+   <label>Durée du carré <input id=cmdSecs type=number min=2 max=30 style=width:70px onchange="cmdOpt('key_overlay_seconds',parseFloat(this.value)||6)"></label>
+ </div>
+ <div id=cmdList style=margin-top:10px></div>
+ <div class=sub style=margin-top:8px>
+   Le catalogue est lu dans <kbd>DCS World\Mods\aircraft\…\Input</kbd> + tes affectations
+   <kbd>Saved Games\DCS\Config\Input</kbd>, traduit en français par DCS lui-même.
+   « Exécuter » appuie sur la touche réelle (DCS doit être au premier plan) ; si la
+   commande n'a pas de touche, le copilote envoie la commande DCS équivalente.
+ </div>
+</div>
+
 <div class=card>
  <h2>🧠 Cerveau (IA)</h2>
  <div class=row style=margin-top:0>
@@ -193,9 +227,12 @@ PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
      <option value=deepseek>DeepSeek</option>
      <option value=anthropic>Anthropic (Claude)</option>
      <option value=openai>OpenAI</option>
+     <option value=custom>Personnalisé (URL + clé API)</option>
      <option value=ollama>Ollama (local)</option>
    </select></label>
-   <label>Modèle <input id=llmModel type=text style=width:200px placeholder="(défaut : deepseek-chat)"></label>
+   <label>Modèle <input id=llmModel type=text list=llmModels style=width:200px placeholder="(défaut : deepseek-chat)">
+     <datalist id=llmModels></datalist></label>
+   <button class=ghost onclick=listModels()>🔄 Lister modèles</button>
  </div>
  <div class=row>
    <label>URL API <input id=llmBase type=text style=width:300px placeholder="(défaut : https://api.deepseek.com/v1)"></label>
@@ -209,7 +246,10 @@ PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
    Le fournisseur doit gérer le <b>tool calling</b>. La clé est stockée localement
    (<kbd>deepseek_key.txt</kbd> / <kbd>apikey.txt</kbd> / <kbd>openai_key.txt</kbd>) et n'est
    jamais affichée en clair. <b>DeepSeek</b> utilise le modèle <kbd>deepseek-chat</kbd> par
-   défaut. <b>Ollama</b> = 100&nbsp;% local, aucune clé. Changer de fournisseur réinitialise
+   défaut. <b>Personnalisé</b> : n'importe quelle API compatible OpenAI — renseigne l'URL de base
+   (ex. <kbd>https://api.mistral.ai/v1</kbd>, <kbd>https://openrouter.ai/api/v1</kbd>) et le nom
+   exact du modèle ; la clé part dans l'en-tête <kbd>Authorization: Bearer</kbd>.
+   <b>Ollama</b> = 100&nbsp;% local, aucune clé. Changer de fournisseur réinitialise
    l'historique de conversation.
  </div>
 </div>
@@ -219,6 +259,11 @@ PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
    <button class=save onclick=save()>💾 Enregistrer la configuration</button>
 </div>
 
+<div class=sub style="max-width:920px;margin-top:6px;border-top:1px solid var(--bd);padding-top:10px">
+  <b>DCS RYZEN Copilote</b> — créé par <b>Eric Boulianne</b> (développeur web &amp; graphiste) ·
+  projet <b>open source</b> sous licence MIT · <a href="https://github.com/ericboul/dsc-ai-deepseek-v1.01"
+  target="_blank" style="color:#00F0FF">github.com/ericboul/dsc-ai-deepseek-v1.01</a>
+</div>
 <script>
 let cfg={};
 async function j(u,o){const r=await fetch(u,o);return r.json()}
@@ -298,20 +343,45 @@ async function testCallsign(){
 }
 function wireLlm(){
   const p=document.getElementById('llmProv');p.value=cfg.llm_provider||'deepseek';
-  p.onchange=()=>{cfg.llm_provider=p.value;save(true);refreshKey()};
+  p.onchange=()=>{cfg.llm_provider=p.value;save(true);applyProvDefaults();refreshKey()};
   const m=document.getElementById('llmModel');m.value=cfg.llm_model||'';
   m.onchange=()=>{cfg.llm_model=m.value;save(true)};
   const b=document.getElementById('llmBase');b.value=cfg.llm_base_url||'';
   b.onchange=()=>{cfg.llm_base_url=b.value;save(true)};
   refreshKey();
 }
+function applyProvDefaults(){
+  // passage en "Personnalisé" : on vide les valeurs DeepSeek pour laisser la place
+  if(cfg.llm_provider!=='custom')return;
+  const b=document.getElementById('llmBase'),m=document.getElementById('llmModel');
+  if(/deepseek\.com/i.test(b.value||'')){b.value='';cfg.llm_base_url='';save(true)}
+  if(/^deepseek-(chat|reasoner)$/i.test((m.value||'').trim())){m.value='';cfg.llm_model='';save(true)}
+}
 async function refreshKey(){
   const r=await j('/api/apikey?provider='+encodeURIComponent(cfg.llm_provider||'deepseek'));
   const row=document.getElementById('keyRow'),m=document.getElementById('keyMsg');
   row.style.display=r.needs?'flex':'none';
   if(!r.needs){return}
+  if((cfg.llm_provider||'')==='custom'&&!(cfg.llm_base_url||'').trim()){
+    m.textContent="⚠ renseigne l’URL API et le nom du modèle avant de coller la clé";
+    m.className='msg warn';return;
+  }
   m.textContent=r.present?('✔ clé enregistrée : '+r.masked):'⚠ aucune clé — requise pour démarrer';
   m.className=r.present?'msg ok':'msg warn';
+}
+async function listModels(){
+  const m=document.getElementById('llmModel'),dl=document.getElementById('llmModels'),
+        msg=document.getElementById('keyMsg');
+  msg.textContent='… interrogation du fournisseur';msg.className='msg';
+  let r;
+  try{r=await j('/api/list_models',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})}
+  catch(e){msg.textContent='⚠ requête impossible';msg.className='msg warn';return}
+  if(!r.ok){msg.textContent='⚠ '+(r.error||'échec');msg.className='msg warn';return}
+  if(!r.models||!r.models.length){msg.textContent='⚠ le fournisseur ne renvoie aucun modèle';msg.className='msg warn';return}
+  dl.innerHTML=r.models.map(x=>'<option value="'+x+'">').join('');
+  if(!m.value.trim()){m.value=r.models[0];cfg.llm_model=m.value;save(true)}
+  msg.textContent='✔ '+r.models.length+' modèle(s) : clique dans le champ pour choisir';
+  msg.className='msg ok';
 }
 async function saveKey(){
   const inp=document.getElementById('llmKey'),m=document.getElementById('keyMsg');
@@ -438,14 +508,63 @@ async function save(silent){
   if(!silent){const m=document.getElementById('saveMsg');
     m.textContent=r.ok?'✔ Appliqué à la volée (copilote mis à jour).':'Erreur';m.className='msg ok';}
 }
+async function pollStatus(){
+  try{const r=await j('/api/status');
+    const el=document.getElementById('listenStatus');
+    let t='En attente de ta voix… — PTT '+(r.ptt||'?')+' · micro '+(r.mic_name||'?')+
+          ' · Whisper '+(r.whisper||'?');
+    if(r.error){t='⚠ '+r.error}
+    else if(r.heard){t='✔ entendu : « '+r.heard+' »'}
+    if(r.rms){t+='   (niveau '+Number(r.rms).toFixed(4)+')'}
+    el.textContent=t;
+  }catch(e){}
+  setTimeout(pollStatus,1500);
+}
 async function pollPTT(){
   try{const r=await j('/api/ptt_state');
     document.getElementById('led').className='led'+(r.pressed?' on':'');
     document.getElementById('pttState').textContent=r.pressed?'PTT ENFONCÉ ✔':'Test PTT : appuie sur ton bouton…';
   }catch(e){}
-  setTimeout(pollPTT,100);
+  setTimeout(pollPTT,250);
 }
-load().then(()=>{wirePersonas();renderPersonas();wirePersonaOpts();wireLlm();});loadLangs();pollPTT();
+async function loadCmd(){
+  try{
+    const info=await j('/api/commands_info');
+    document.getElementById('cmdInfo').innerHTML =
+      'Avion : <b>'+(info.aircraft||'aucun (entre en vol)')+'</b> — '+info.total+
+      ' commandes connues, '+info.keyboard+' avec touche clavier · DCS : '+
+      (info.dcs||'introuvable')+' · fenêtre DCS '+(info.window?'détectée':'fermée')+'.';
+    document.getElementById('cmdInject').checked=!!cfg.key_injection;
+    document.getElementById('cmdOverlay').checked=!!cfg.key_overlay;
+    document.getElementById('cmdSecs').value=cfg.key_overlay_seconds||6;
+    if(!document.getElementById('cmdQ').value)document.getElementById('cmdQ').value='train';
+    cmdSearch();
+  }catch(e){document.getElementById('cmdInfo').textContent='catalogue indisponible : '+e}
+}
+async function cmdSearch(){
+  const q=document.getElementById('cmdQ').value||'train';
+  try{
+    const r=await j('/api/commands?q='+encodeURIComponent(q));
+    const rows=r.commandes||[];
+    document.getElementById('cmdList').innerHTML = rows.length? rows.map(c=>
+      '<div class=prow><b style="min-width:110px">'+(c.touche||'—')+'</b><span>'+c.label+
+      '</span><span style="color:var(--mut);font-size:11px">'+(c.zone||'')+
+      (c.type==='HOTAS'?' · HOTAS':'')+'</span></div>').join('')
+      : '<span class=msg>aucune commande trouvée</span>';
+  }catch(e){document.getElementById('cmdList').textContent='erreur : '+e}
+}
+async function cmdAction(a){
+  const q=document.getElementById('cmdQ').value||'';
+  const m=document.getElementById('cmdMsg');
+  try{
+    const r=await j('/api/command',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:a,control:q})});
+    m.textContent = r.ok ? ('✔ '+(r.label||q)+' — '+(r.touche||r.via||'')) : ('✖ '+(r.error||'échec'));
+    m.className='msg '+(r.ok?'ok':'warn');
+  }catch(e){m.textContent='erreur : '+e;m.className='msg warn'}
+}
+function cmdOpt(k,v){cfg[k]=v;save(true);}
+load().then(()=>{wirePersonas();renderPersonas();wirePersonaOpts();wireLlm();loadCmd();});loadLangs();pollPTT();pollStatus();
 </script></body></html>"""
 
 
@@ -469,6 +588,52 @@ def api_set_config():
 @app.get("/api/mics")
 def api_mics():
     return jsonify(audioio.list_input_devices())
+
+
+@app.get("/api/status")
+def api_status():
+    """Où en est le copilote : dernier texte entendu, erreur éventuelle, niveau micro."""
+    st = dict(core.STATE.get("status") or {})
+    cfg = core.get_config()
+    st["mic_name"] = cfg.get("mic_device_name") or "(micro par défaut)"
+    ptt_cfg = cfg.get("ptt") or {}
+    st["ptt"] = ptt_cfg.get("label") or ptt_cfg.get("key") or "?"
+    st["whisper"] = cfg.get("whisper_model") or "?"
+    st["telemetry"] = bool(getattr(core.STATE.get("telemetry"), "ok", False))
+    return jsonify(st)
+
+
+@app.post("/api/list_models")
+def api_list_models():
+    """Liste les modèles réellement accessibles avec la clé configurée (GET {URL}/models)."""
+    import apikeys
+    import httpx
+    cfg = core.get_config()
+    prov = (cfg.get("llm_provider") or "deepseek").lower()
+    base = (cfg.get("llm_base_url") or "").rstrip("/")
+    if not base:
+        base = {"deepseek": "https://api.deepseek.com/v1",
+                "openai": "https://api.openai.com/v1",
+                "ollama": "http://localhost:11434/v1"}.get(prov, "")
+    if not base:
+        return jsonify({"ok": False,
+                        "error": "URL API vide : renseigne l'URL de base (ex. https://top-tools-ai.com/api/v1)."})
+    key = apikeys.current_key(prov, cfg) or ""
+    headers = {"Authorization": "Bearer " + key} if key else {}
+    try:
+        r = httpx.get(base + "/models", headers=headers, timeout=25)
+        r.raise_for_status()
+        data = r.json()
+    except Exception as e:
+        return jsonify({"ok": False, "error": "%s : %s" % (type(e).__name__, str(e)[:160]),
+                        "base": base})
+    items = data.get("data") if isinstance(data, dict) else data
+    ids = []
+    for it in items or []:
+        mid = it.get("id") if isinstance(it, dict) else str(it)
+        if mid:
+            ids.append(mid)
+    return jsonify({"ok": True, "models": ids, "base": base, "provider": prov})
 
 
 @app.get("/api/languages")
@@ -595,7 +760,7 @@ def api_test_control():
         if not cli.ping():
             return jsonify({"ok": False,
                             "error": "Pas de réponse. Es-tu EN MISSION (non en pause) ? Hook/mod installé ?"})
-        reply = cli.out_text("DCS AI DeepSeek connecté.", 10)
+        reply = cli.out_text("DCS RYZEN Copilote connecté.", 10)
         # reply == "ERR: ..." révèle un souci d'exécution côté mission (diagnostic).
         if isinstance(reply, str) and reply.startswith("ERR"):
             return jsonify({"ok": False, "error": f"DCS a répondu : {reply}"})
@@ -658,3 +823,66 @@ def api_test_mic():
         return jsonify({"error": f"transcription impossible : {e}", "level_bar": level_bar})
 
     return jsonify({"level_bar": level_bar, "text": text})
+
+
+# ---------------------------------------------------------------------------
+# Commandes de l'avion (catalogue, carré de touche, exécution)
+# ---------------------------------------------------------------------------
+@app.get("/api/commands_info")
+def api_commands_info():
+    """Avion courant + taille du catalogue de commandes + état DCS."""
+    import dcs_keys
+    import win_io
+    cfg = core.get_config()
+    t = {}
+    tel = core.STATE.get("telemetry")
+    if tel is not None and hasattr(tel, "get"):
+        t = tel.get() or {}
+    ac = (cfg.get("aircraft_profile") or "").strip() or t.get("aircraft")
+    try:
+        c = dcs_keys.count(ac)
+    except Exception:
+        c = {"total": 0, "keyboard": 0}
+    try:
+        dcs = dcs_keys.dcs_install(cfg.get("dcs_install") or None)
+    except Exception:
+        dcs = None
+    try:
+        win = win_io.dcs_running()
+    except Exception:
+        win = False
+    return jsonify({"aircraft": ac, "total": c["total"], "keyboard": c["keyboard"],
+                    "dcs": dcs, "window": win,
+                    "app": cfg.get("app_name", "DCS RYZEN Copilote")})
+
+
+def _ui_bridge():
+    """Pont de commandes partagé avec la boucle du copilote (même processus)."""
+    f = core.STATE.get("bridge_factory")
+    if callable(f):
+        return f()
+    import command_bridge
+    return command_bridge.CommandBridge(core.get_control(),
+                                        overlay=core.STATE.get("overlay"))
+
+
+@app.get("/api/commands")
+def api_commands():
+    q = request.args.get("q", "")
+    try:
+        return jsonify({"ok": True, "commandes": _ui_bridge().list(q, limit=12)})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e), "commandes": []})
+
+
+@app.post("/api/command")
+def api_command():
+    data = request.get_json(force=True)
+    action = (data.get("action") or "show").lower()
+    control = data.get("control") or ""
+    try:
+        br = _ui_bridge()
+        res = br.press(control) if action == "press" else br.show(control)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)})

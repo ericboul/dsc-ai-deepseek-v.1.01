@@ -1,4 +1,13 @@
-# 📖 Guide détaillé — DCS AI DeepSeek
+# 📖 Guide détaillé — DCS RYZEN Copilote
+
+> **Nouveau (DCS RYZEN Copilote) — commandes de l'avion.** Le copilote connaît
+> toutes les commandes de ton appareil (catalogue DCS + tes affectations HOTAS,
+> traduit en français par DCS), peut les **exécuter** (« sors le train », « master
+> arm », « pilote auto maintien altitude ») et affiche la **touche dans un carré**
+> par-dessus le jeu pour te la montrer. Rôle « Instructeur / copilote » : il
+> enseigne décollage, atterrissage et combat, une étape à la fois. Réglages :
+> carte « Commandes de l'avion & carré des touches » de l'interface web.
+
 
 Documentation complète (installation, interface, capacités, dépannage).
 Pour la présentation, voir le [README](README.md).
@@ -234,4 +243,4 @@ mission) → réponse → **Piper/SAPI** (voix) / affichage écran. La télémé
 ---
 
 *Projet original **Claude Copilot for DCS** par **Snurpsss & Claude**.
-Version **DCS AI DeepSeek 1.01** — non affiliée à Eagle Dynamics ni à DeepSeek.*
+Version **DCS RYZEN Copilote 1.01** — non affiliée à Eagle Dynamics ni à DeepSeek.*

@@ -1,21 +1,40 @@
 <div align="center">
 
-# 🎙️ DCS AI DeepSeek
+# 🎙️ DCS RYZEN Copilote
 
-**Un copilote vocal intelligent pour [DCS World](https://www.digitalcombatsimulator.com/) —
-parle à ton équipage, il agit dans la mission.**
+**Le copilote de combat vocal pour [DCS World](https://www.digitalcombatsimulator.com/) —
+il connaît toutes les commandes de ton avion, il les exécute, il te montre la touche
+dans un carré, et son cerveau tourne sur le NPU de ton PC.**
 
-*Reconnaissance vocale locale · IA à outils (DeepSeek par défaut, OpenAI / Ollama) · voix neuronale ·
-multi-personas (opérateur, AWACS, ailier) · spawn & contrôle en jeu — le tout sans mod lourd
-ni modification de `MissionScripting.lua`.*
+*Reconnaissance vocale locale · IA locale sur NPU Ryzen AI (qwen3.5:4b) ou cloud au choix ·
+voix neuronale Piper · multi-personas (instructeur, opérateur, AWACS, ailier) ·
+commandes cockpit exécutées · spawn & contrôle en jeu — sans mod lourd ni modification de
+`MissionScripting.lua`.*
 
-**Version DeepSeek 1.01 — basée sur le projet original de Snurpsss & Claude**
+**Version 2.0 « RYZEN » — créée par [Eric Boulianne](https://github.com/ericboul)
+(développeur web & graphiste), à partir du projet open source de Snurpsss & Claude**
 
-📖 **[Guide détaillé →](GUIDE.md)** · [Installation](#-installation) · [Fonctionnalités](#-fonctionnalités)
+*Projet **open source** sous licence MIT — code lisible, modifiable et redistribuable.*
+
+📄 **[Dossier de présentation (PDF)](docs/DCS-RYZEN-COPILOTE.pdf)** ·
+📖 **[Guide détaillé →](GUIDE.md)** · [Installation](#-installation) · [Nouveautés](#-nouveautés-version-20)
 
 </div>
 
 ---
+
+## 🆕 Nouveautés version 2.0
+
+| Ajout | Détail |
+|---|---|
+| **Toutes les commandes de l'appareil** | Catalogue lu dans les profils DCS + tes affectations HOTAS, traduit en français par DCS lui-même. 971 commandes sur le F/A-18C (321 touches), 856 sur F-15E, 757 sur Ka-50 III… |
+| **Le carré de la touche** | À l'écran, au-dessus de DCS : touche en gros, libellé exact, zone du cockpit. Clique-à-travers, ne vole pas le focus. |
+| **Exécution réelle** | « sors le train » → Maj+G ; « active le master arm » → M ; « pilote auto maintien d'altitude », « palier », « débraye » → commandes DCS. |
+| **Chemin direct sans IA** | Les commandes avion sont reconnues de façon déterministe (≈0,2 s) : un modèle 4B local ne peut pas les casser. |
+| **IA locale sur NPU** | `flm serve qwen3.5:4b` (FastFlowLM) sur le NPU Ryzen AI, adresse `http://127.0.0.1:52625/v1` — aucune clé API, aucune donnée envoyée. |
+| **Rôle instructeur** | Démarrage, décollage, atterrissage, combat : une étape à la fois, touche affichée, valeur à tenir, correction brève. |
+| **Nouvelle interface** | Carte « Commandes de l'avion & carré des touches » : chercher, afficher, exécuter ; cases d'activation et durée du carré. |
+| **Nouveau nom & icône** | `DCS-RYZEN-Copilote.exe` (assistant + lanceur), raccourci Bureau « DCS RYZEN Copilote ». |
 
 ## ✨ En bref
 
@@ -171,7 +190,7 @@ un dossier léger.
 ## 🙌 Crédits
 
 Projet original **Claude Copilot for DCS** par **Snurpsss & Claude**.
-Version **DCS AI DeepSeek 1.01** : adaptation de l'application au modèle **DeepSeek**
+Version **DCS RYZEN Copilote 1.01** : adaptation de l'application au modèle **DeepSeek**
 (`deepseek-chat`) via l'API compatible OpenAI.
 
 Inspiré par la communauté DCS et par des outils tiers comme

@@ -38,7 +38,7 @@ if "%DEEPSEEK_API_KEY%"=="" if exist "deepseek_key.txt" set /p DEEPSEEK_API_KEY=
 if "%ANTHROPIC_API_KEY%"=="" if exist "apikey.txt" set /p ANTHROPIC_API_KEY=<apikey.txt
 if "%OPENAI_API_KEY%"=="" if exist "openai_key.txt" set /p OPENAI_API_KEY=<openai_key.txt
 
-echo Lancement du DCS AI DeepSeek (interface + copilote)...
+echo Lancement du DCS RYZEN Copilote (interface + copilote)...
 "%~dp0python\python.exe" "%~dp0app.py"
 echo.
 pause

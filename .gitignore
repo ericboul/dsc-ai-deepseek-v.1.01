@@ -13,3 +13,16 @@ models/
 # Caches
 __pycache__/
 *.pyc
+
+# Journal de l'installateur EB
+EB-INSTALLATION-LOG.txt
+# Binaires compilés (rebuild avec PyInstaller, voir README)
+*.exe
+build_tmp/
+
+# Journaux
+*.log
+
+# Fichiers de travail (probes, rendus temporaires)
+_*.png
+_*.html

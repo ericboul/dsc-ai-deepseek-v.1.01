@@ -87,7 +87,11 @@ def _fetch(url, dest):
 
 
 def download(key):
-    """Télécharge la voix `key` (son .onnx + .onnx.json). Renvoie le chemin .onnx."""
+    """Télécharge la voix `key` (son .onnx + .onnx.json). Renvoie le chemin .onnx.
+
+    Idempotent : si les fichiers sont déjà là, rien n'est retéléchargé (une voix
+    Piper pèse ~60 Mo, inutile de la reprendre à chaque sélection).
+    """
     e = _index().get(key)
     if not e:
         raise ValueError(f"voix inconnue : {key}")
@@ -97,6 +101,11 @@ def download(key):
     d = dcs_config.PIPER_VOICES_DIR
     os.makedirs(d, exist_ok=True)
     dest_onnx = os.path.join(d, os.path.basename(onnx))
-    _fetch(f"{HF}/{meta}", dest_onnx + ".json")   # petit fichier d'abord
-    _fetch(f"{HF}/{onnx}", dest_onnx)              # gros modèle ensuite
+    if os.path.isfile(dest_onnx + ".json") and os.path.isfile(dest_onnx) \
+            and os.path.getsize(dest_onnx) > 0:
+        return dest_onnx
+    if not os.path.isfile(dest_onnx + ".json"):
+        _fetch(f"{HF}/{meta}", dest_onnx + ".json")   # petit fichier d'abord
+    if not os.path.isfile(dest_onnx) or os.path.getsize(dest_onnx) == 0:
+        _fetch(f"{HF}/{onnx}", dest_onnx)              # gros modèle ensuite
     return dest_onnx

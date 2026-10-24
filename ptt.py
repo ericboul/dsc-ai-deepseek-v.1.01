@@ -99,19 +99,65 @@ def capture_binding(timeout=15.0):
     return result.get("b")
 
 
+# Certaines dispositions Windows renomment les touches (« ctrl droite » au lieu
+# de « right ctrl ») : on accepte les variantes pour que le PTT par défaut
+# fonctionne aussi sur un clavier français.
+KEY_ALIASES = {
+    "right ctrl": {"right ctrl", "ctrl droite", "ctrl derecha", "rechte strg",
+                   "ctrl destro", "ctrl direita"},
+    "left ctrl": {"left ctrl", "ctrl gauche", "ctrl izquierda", "linke strg",
+                  "ctrl sinistro", "ctrl esquerda"},
+    "right shift": {"right shift", "maj droite", "shift derecha", "rechte umschalt"},
+    "left shift": {"left shift", "maj gauche", "shift izquierda", "linke umschalt"},
+    "right alt": {"right alt", "alt droite", "alt gr"},
+    "left alt": {"left alt", "alt gauche"},
+    "space": {"space", "espace", "espacio", "leertaste"},
+    "enter": {"enter", "entrée", "entree", "intro", "return", "eingabe"},
+    "escape": {"escape", "esc", "echap", "échappe"},
+}
+
+
+def _key_variants(key):
+    key = (key or "").lower().strip()
+    return KEY_ALIASES.get(key, {key})
+
+
 class PTTMonitor:
-    """Surveille un binding et met à jour .pressed en continu."""
+    """Surveille un binding et met à jour .pressed en continu.
+
+    Le clavier est suivi par un hook (et non plus seulement par
+    keyboard.is_pressed) : selon la disposition Windows, une touche peut
+    s'appeler « ctrl droite » au lieu de « right ctrl », avec un code scan
+    différent — is_pressed ne la voyait alors jamais.
+    """
 
     def __init__(self, binding):
         self.binding = binding
         self.pressed = False
         self._stop = False
         self._paused = False
+        self._names = set()
+        self._scans = set()
+        self._lock = threading.Lock()
+        self._hook = keyboard.hook(self._on_event, suppress=False)
         self._thread = threading.Thread(target=self._loop, daemon=True)
         self._thread.start()
 
+    def _on_event(self, event):
+        with self._lock:
+            name = (event.name or "").lower()
+            if event.event_type == "down":
+                self._names.add(name)
+                self._scans.add(event.scan_code)
+            else:
+                self._names.discard(name)
+                self._scans.discard(event.scan_code)
+
     def rebind(self, binding):
         self.binding = binding
+        with self._lock:
+            self._names.clear()
+            self._scans.clear()
 
     def pause(self):
         self._paused = True
@@ -121,6 +167,10 @@ class PTTMonitor:
 
     def stop(self):
         self._stop = True
+        try:
+            keyboard.unhook(self._hook)
+        except Exception:
+            pass
 
     def _find_joy(self, binding):
         pg = _pg()
@@ -152,7 +202,27 @@ class PTTMonitor:
                 if not b:
                     self.pressed = False
                 elif b["type"] == "keyboard":
-                    self.pressed = keyboard.is_pressed(b["key"])
+                    key = (b.get("key") or "").lower()
+                    with self._lock:
+                        names = set(self._names)
+                        scans = set(self._scans)
+                    variants = _key_variants(key)
+                    hit = bool(names & variants)
+                    if not hit and scans:
+                        for variant in variants:
+                            try:
+                                wanted = set(keyboard.key_to_scan_codes(variant))
+                            except Exception:
+                                wanted = set()
+                            if wanted & scans:
+                                hit = True
+                                break
+                    if not hit:
+                        try:
+                            hit = bool(key) and keyboard.is_pressed(key)
+                        except Exception:
+                            hit = False
+                    self.pressed = hit
                 else:
                     pg = _pg()
                     if joy is None or cur_guid != b.get("guid"):

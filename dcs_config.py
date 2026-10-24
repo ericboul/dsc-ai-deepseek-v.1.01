@@ -39,6 +39,16 @@ SPOKEN_LANGUAGES = [
 LANG_NAMES = {l["code"]: l["label"] for l in SPOKEN_LANGUAGES}
 
 DEFAULTS = {
+    # Nom affiché de l'application / du copilote
+    "app_name": "DCS RYZEN Copilote",
+    # Commandes de l'avion
+    "voice_fastpath": True,       # commandes avion reconnues sans LLM (fiable)
+    "key_injection": True,        # le copilote peut appuyer sur les touches
+    "key_overlay": True,          # carré de la touche affiché par-dessus DCS
+    "key_overlay_seconds": 6,     # durée d'affichage du carré
+    "aircraft_profile": "",       # force un profil DCS (ex. FA-18C) si télémétrie absente
+    "dcs_install": "",            # racine de DCS World (sinon détection auto)
+    "dcs_saved_games": "",        # dossier Saved Games\DCS (sinon détection auto)
     # Push-to-talk : type "keyboard" ou "joystick"
     "ptt": {"type": "keyboard", "key": "right ctrl", "label": "Ctrl droit"},
     # Micro : index du périphérique sounddevice (None = défaut système)
@@ -81,9 +91,9 @@ DEFAULTS = {
     "control_port": 5011,        # port du hook Lua
     # Multi-persona : plusieurs opérateurs, chacun sa voix/langue/fréquence/rôle.
     "personas": [
-        {"id": "magic", "callsign": "Magic", "freq": "305.0", "language": "fr",
+        {"id": "ryzen", "callsign": "Ryzen", "freq": "305.0", "language": "fr",
          "voice": os.path.join(PIPER_VOICES_DIR, "fr_FR-siwis-medium.onnx"),
-         "role": "operator", "enabled": True},
+         "role": "instructor", "enabled": True},
         {"id": "overlord", "callsign": "Overlord", "freq": "251.0", "language": "fr",
          "voice": os.path.join(PIPER_VOICES_DIR, "fr_FR-tom-medium.onnx"),
          "role": "awacs", "enabled": True},
@@ -91,7 +101,7 @@ DEFAULTS = {
          "voice": os.path.join(PIPER_VOICES_DIR, "fr_FR-siwis-medium.onnx"),
          "role": "wingman", "enabled": True},
     ],
-    "active_persona": "magic",   # persona par défaut si aucun indicatif détecté
+    "active_persona": "ryzen",   # persona par défaut si aucun indicatif détecté
     # Adressage des personas :
     "ptt_mode": "global",        # "global" (un seul PTT) ou "per_persona" (un PTT par persona)
     "freq_required": False,      # True = il FAUT être sur la fréquence du persona pour le joindre

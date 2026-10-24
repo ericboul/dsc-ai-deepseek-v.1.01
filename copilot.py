@@ -1,6 +1,7 @@
 """
-Boucle du copilote : push-to-talk -> Whisper -> DeepSeek (outils DCS)
--> voix (Piper/SAPI) + affichage DCS (gRPC) + radio (SRS).
+DCS RYZEN Copilote — boucle du copilote : push-to-talk -> Whisper -> LLM
+(outils DCS) -> voix (Piper/SAPI) + commandes de l'avion (touches + carré à
+l'écran) + affichage DCS + radio (SRS).
 
 Toute la config est relue à CHAQUE tour depuis core -> réglages à la volée.
 Lancé par app.py (en même temps que l'interface web).
@@ -23,6 +24,7 @@ import srs
 import core
 import personas
 import ptt
+import fastpath
 
 UDP_PORT    = 5010            # doit correspondre à dcs_claude_export.lua
 SAMPLE_RATE = 16000           # Whisper attend du 16 kHz mono
@@ -30,19 +32,40 @@ SAMPLE_RATE = 16000           # Whisper attend du 16 kHz mono
 
 
 class TelemetryListener:
-    """Écoute l'UDP de DCS en thread de fond, garde le dernier état."""
+    """Écoute l'UDP de DCS en thread de fond, garde le dernier état.
+
+    Non bloquant : si le port est déjà pris (deuxième instance du copilote
+    lancée par erreur), on continue sans télémétrie au lieu de tuer l'app.
+    """
     def __init__(self, port=UDP_PORT):
         self._latest = None
         self._lock = threading.Lock()
+        self.ok = False
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self._sock.bind(("127.0.0.1", port))
+        try:
+            self._sock.bind(("127.0.0.1", port))
+        except OSError as e:
+            print(f"[télémétrie] port UDP {port} déjà utilisé ({e}).")
+            print("[télémétrie] Une autre instance du copilote tourne probablement déjà :")
+            print("[télémétrie] le copilote démarre SANS télémétrie DCS. Ferme l'autre")
+            print("[télémétrie] fenêtre (ou le python.exe en trop) puis relance.")
+            try:
+                self._sock.close()
+            except Exception:
+                pass
+            self._sock = None
+            return
         self._sock.settimeout(0.5)
+        self.ok = True
         threading.Thread(target=self._loop, daemon=True).start()
 
     def _loop(self):
+        sock = self._sock
+        if sock is None:
+            return
         while True:
             try:
-                data, _ = self._sock.recvfrom(2048)
+                data, _ = sock.recvfrom(2048)
                 parsed = json.loads(data.decode("utf-8"))
                 with self._lock:
                     self._latest = parsed
@@ -149,7 +172,54 @@ def run_copilot():
         print("Clé API détectée. Démarrage du copilote.")
 
     telemetry = TelemetryListener()
+    core.STATE["telemetry"] = telemetry
     monitor = core.STATE["monitor"]      # partagé avec l'interface (rebind live)
+
+    # ------------------------------------------------------------------
+    # Commandes de l'avion : carré de touche à l'écran + exécution
+    # ------------------------------------------------------------------
+    import command_bridge
+    import dcs_keys
+    import overlay as overlay_mod
+
+    cfg0 = core.get_config()
+    ov = None
+    if cfg0.get("key_overlay", True):
+        try:
+            ov = overlay_mod.KeyOverlay(seconds=float(cfg0.get("key_overlay_seconds", 6)))
+            print("[carré] affichage de la touche prêt (au-dessus de DCS).")
+        except Exception as e:
+            print(f"[carré] overlay indisponible : {e}")
+            ov = None
+
+    def current_aircraft():
+        t = telemetry.get() or {}
+        prof = (core.get_config().get("aircraft_profile") or "").strip()
+        return prof or t.get("aircraft") or None
+
+    def bridge_now():
+        c = core.get_config()
+        return command_bridge.CommandBridge(
+            core.get_control(), overlay=ov,
+            air_bridge=current_aircraft,
+            injection=bool(c.get("key_injection", True)),
+            display=bool(c.get("display_responses", True)))
+
+    core.STATE["overlay"] = ov
+    core.STATE["bridge_factory"] = bridge_now
+    if cfg0.get("dcs_install"):
+        os.environ["DCS_INSTALL"] = cfg0["dcs_install"]
+    if cfg0.get("dcs_saved_games"):
+        os.environ["DCS_SAVED_GAMES"] = cfg0["dcs_saved_games"]
+
+    try:
+        ac = current_aircraft()
+        n = dcs_keys.count(ac)
+        print(f"[commandes] {n['total']} commandes connues pour {ac or 'l’avion courant'} "
+              f"({n['keyboard']} avec touche clavier).")
+    except Exception as e:
+        print(f"[commandes] catalogue indisponible : {e}")
+
 
     ALL_TOOLS = [
         {
@@ -338,6 +408,70 @@ def run_copilot():
             "description": "Retire l'encadrement de commande du cockpit.",
             "input_schema": {"type": "object", "properties": {}, "required": []},
         },
+        {
+            "name": "press_control",
+            "description": (
+                "EXÉCUTE une commande de l'avion du pilote, comme s'il appuyait dessus : "
+                "train d'atterrissage, volets, aérofreins, crosse, perche de "
+                "ravitaillement, master arm, feux, pilote automatique, contre-mesures… "
+                "Donne le nom en français, tel que le pilote le dirait (ex : « train "
+                "d'atterrissage », « sortir le train », « master arm sur armé »). "
+                "La touche utilisée s'affiche dans un carré à l'écran. "
+                "Réponse ok=false -> dis au pilote ce qui manque (interrupteur cockpit)."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {"control": {"type": "string",
+                                           "description": "commande en français"}},
+                "required": ["control"],
+            },
+        },
+        {
+            "name": "show_control",
+            "description": (
+                "Affiche dans un carré à l'écran la TOUCHE d'une commande, sans "
+                "l'exécuter : sert à montrer au pilote ce qu'il doit presser pendant "
+                "une procédure (démarrage, décollage, atterrissage, combat). "
+                "À utiliser systématiquement quand tu cites une touche."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {"control": {"type": "string"}},
+                "required": ["control"],
+            },
+        },
+        {
+            "name": "list_controls",
+            "description": (
+                "Cherche les commandes de l'avion (libellé exact + touche + zone du "
+                "cockpit). À utiliser quand tu ne connais pas le nom exact d'une "
+                "commande, ou pour proposer plusieurs variantes au pilote."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {"query": {"type": "string"},
+                               "limit": {"type": "integer", "default": 6}},
+                "required": ["query"],
+            },
+        },
+        {
+            "name": "autopilot",
+            "description": (
+                "Règle l'autopilote : alt_hold (maintien d'altitude), att_hold "
+                "(maintien d'assiette), alt_bank (altitude + roulis), level (retour "
+                "au vol en palier), alt_hdg (altitude + cap), route (suivi de "
+                "route), override, off (débrayage)."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "mode": {"type": "string",
+                             "enum": ["alt_hold", "att_hold", "alt_bank", "level",
+                                      "alt_hdg", "route", "override", "off"]},
+                },
+                "required": ["mode"],
+            },
+        },
     ]
 
     def run_tool(name, tool_input):
@@ -458,14 +592,31 @@ def run_copilot():
             if ctrl and hasattr(ctrl, "remove_highlight"):
                 ctrl.remove_highlight()
             return {"ok": True}
+        if name in ("press_control", "show_control", "list_controls", "autopilot"):
+            br = bridge_now()
+            if br is None:
+                return {"error": "Commandes avion indisponibles (canal DCS fermé)."}
+            a = tool_input or {}
+            try:
+                if name == "press_control":
+                    return br.press(a.get("control", ""))
+                if name == "show_control":
+                    return br.show(a.get("control", ""))
+                if name == "list_controls":
+                    return {"commandes": br.list(a.get("query", ""),
+                                                 limit=int(a.get("limit", 6)))}
+                return br.autopilot(a.get("mode", "alt_hold"))
+            except Exception as e:
+                return {"error": str(e)}
         return {"error": f"outil inconnu: {name}"}
 
     histories = {}   # id persona -> historique de conversation (opaque, propre au LLM)
     last_llm_key = None
     persona_monitors = {}   # id -> PTTMonitor (mode per_persona)
     mon_sig = None
-    print("\n=== DCS AI DeepSeek prêt (MULTI-PERSONA, réglages à la volée) ===")
+    print("\n=== DCS RYZEN Copilote prêt (MULTI-PERSONA, réglages à la volée) ===")
     print("Adresse un persona par indicatif, fréquence ou bouton PTT dédié.")
+    print("Commandes avion : dis « sors le train », « master arm », « pilote auto maintien altitude ».")
     print("Sois en vol dans DCS. Ctrl+C pour quitter.\n")
 
     while True:
@@ -495,11 +646,25 @@ def run_copilot():
             print("  ... écoute (relâche pour envoyer)")
             audio = _record_active(active_mon, mic_device)
             if audio.size < SAMPLE_RATE * 0.3:
-                print("  (rien capté)")
+                print("  (rien capté : appui trop court ?)")
+                core.STATE["status"] = {"heard": "", "error": "appui trop court", "rms": 0.0}
+                continue
+
+            rms = float(np.sqrt(np.mean(np.square(audio)))) if audio.size else 0.0
+            core.STATE["status"] = {"heard": "", "error": "", "rms": rms}
+            if rms < 0.0015:
+                print(f"  (micro quasi silencieux : niveau {rms:.5f}) — vérifie le micro "
+                      f"choisi (carte Micro) et le mute du casque.")
+                core.STATE["status"] = {"heard": "", "rms": rms,
+                                        "error": "micro quasi silencieux (niveau %.5f)" % rms}
                 continue
 
             user_text = core.transcribe(audio, cfg["language"])
+            core.STATE["status"] = {"heard": user_text or "", "rms": rms,
+                                    "error": "" if user_text else "transcription vide"}
             if not user_text:
+                print(f"  (rien d'intelligible : niveau {rms:.4f}) — Whisper n'a pas "
+                      f"compris ; parle plus près du micro ou essaie le modèle « small ».")
                 continue
 
             control = core.get_control()
@@ -513,6 +678,45 @@ def run_copilot():
                 continue
             print(f"Toi> [{persona.get('callsign')}] {msg}")
 
+            # ------------------------------------------------------------------
+            # Chemin rapide : commande d'avion reconnue SANS IA.
+            # Indispensable avec un petit modèle local (4B sur NPU) qui se trompe
+            # sur les arguments d'outils : « sors le train » doit marcher à coup
+            # sûr et tout de suite, même sans cerveau disponible.
+            # ------------------------------------------------------------------
+            if cfg.get("voice_fastpath", True):
+                try:
+                    intent = fastpath.detect(msg, current_aircraft(),
+                                             cfg.get("language", "fr"))
+                except Exception as e:
+                    print(f"[commande directe] analyse impossible : {e}")
+                    intent = None
+                if intent:
+                    br = bridge_now()
+                    if intent["action"] == "autopilot":
+                        res = br.autopilot(intent["mode"])
+                    elif intent["action"] == "show":
+                        res = br.show(intent["query"])
+                    else:
+                        res = br.press(intent["query"])
+                    spoken = fastpath.reply(intent, res)
+                    print(f"  [commande directe] {intent['action']} "
+                          f"{intent.get('mode') or ''} -> ok={res.get('ok')} "
+                          f"{res.get('touche') or ''}")
+                    if not res.get("ok"):
+                        print(f"  [commande directe] {res.get('error')}")
+                    core.STATE["status"] = {
+                        "heard": user_text, "error": "", "rms": rms,
+                        "commande": res.get("label") or "",
+                        "touche": res.get("touche") or ""}
+                    if res.get("proches"):
+                        core.STATE["status"]["proches"] = res["proches"]
+                    if spoken:
+                        cs = persona.get("callsign", "")
+                        print(f"{cs}> {spoken}")
+                        core.speak_as(persona.get("voice"), spoken)
+                    continue
+
             # Le cerveau (LLM) est interchangeable. On vide les historiques si on a
             # changé de fournisseur/modèle (formats d'historique incompatibles).
             llm = core.get_llm()
@@ -521,6 +725,33 @@ def run_copilot():
                 last_llm_key = core.STATE.get("llm_key")
 
             system_prompt = personas.build_prompt(persona)
+            # Avec un petit modèle local, on lui DONNE les libellés exacts :
+            # il n'a plus qu'à choisir au lieu d'inventer un nom de commande.
+            try:
+                cands = fastpath.candidates(msg, current_aircraft(),
+                                            cfg.get("language", "fr"), limit=4)
+            except Exception:
+                cands = []
+            if cands:
+                system_prompt += ("\n\nCOMMANDES PROCHES DE LA DEMANDE "
+                                  "(réutilise le libellé EXACT dans press_control / "
+                                  "show_control) : " +
+                                  " | ".join("%s (%s)" % (c["label"], c["touche"])
+                                             for c in cands))
+
+            # Avec un petit modèle local, on lui DONNE les libellés exacts :
+            # il n'a plus qu'à choisir, au lieu d'inventer un nom de commande.
+            try:
+                cands = fastpath.candidates(msg, current_aircraft(),
+                                            cfg.get("language", "fr"), limit=4)
+            except Exception:
+                cands = []
+            if cands:
+                system_prompt += ("\n\nCOMMANDES PROCHES DE LA DEMANDE "
+                                  "(réutilise le libellé EXACT dans press_control / "
+                                  "show_control) : " +
+                                  " | ".join("%s (%s)" % (c["label"], c["touche"])
+                                             for c in cands))
             tools = personas.role_tools(persona.get("role"), ALL_TOOLS)
             history = histories.get(persona["id"], [])
             try:

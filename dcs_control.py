@@ -258,6 +258,29 @@ class DcsControl:
         return self.mission("trigger.action.outText(%s, %d, false)"
                             % (_lua_str(text), int(seconds)))
 
+    def export(self, code):
+        """Exécute du Lua dans l'environnement EXPORT de DCS.
+
+        C'est le seul état qui expose l'API d'export (LoSetCommand, LoGet*),
+        donc celui qui permet d'AGIR sur l'avion sans passer par le clavier.
+        """
+        one = " ".join(str(code).splitlines())
+        one = one.replace("]=]", "]=] ")
+        return self.send_lua('net.dostring_in("export", [==[%s]==])' % one)
+
+    def sim_command(self, command, value=0, wait_reply=True):
+        """Envoie une commande SIMULATEUR DCS (LoSetCommand).
+
+        Ex. 430 = train rentré, 431 = train sorti, 389 = maintien d'altitude,
+        283 = master arm. Renvoie la réponse brute, ou None si le hook ne
+        répond pas (jeu fermé / pas en vol).
+        """
+        return self.export("LoSetCommand(%d, %s)" % (int(command), value))
+
+    def key_banner(self, key_text, label, seconds=8):
+        """Bandeau « ⌨ TOUCHE -> commande » à l'écran de DCS."""
+        return self.out_text("%s   ->   %s" % (key_text, label), seconds)
+
     # Tâches par type de mission (route point task + tâche de groupe + extra unité).
     _MISSIONS = {
         "cap": {"grouptask": "CAP",
