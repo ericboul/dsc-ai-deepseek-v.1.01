@@ -435,6 +435,30 @@ def _profiles(module_dir):
     return out
 
 
+_INCLUDED = re.compile(r"""external_profile\s*\(\s*[A-Za-z0-9_]+\s*\.\.\s*"([^"]+)"\s*\)""")
+
+
+def included_profiles(path, root):
+    """Profils inclus par un .lua de module (external_profile("F-14-Pilot/keyboard/default.lua")).
+
+    Indispensable pour les modules « Update » (F-14BU, etc.) qui n'ont que des
+    surcharges et héritent des commandes du module d'origine.
+    """
+    out = []
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            txt = f.read()
+    except Exception:
+        return out
+    for rel in _INCLUDED.findall(txt):
+        rel = rel.replace("\\\\", "/").replace("\\", "/").lstrip("./")
+        for base in _module_roots(root):
+            for hit in glob.glob(os.path.join(base, "*", "Input", rel)):
+                if os.path.isfile(hit):
+                    out.append(hit)
+    return out
+
+
 def find_aircraft(aircraft_type, root=None):
     """Trouve (module_dir, profile_name, input_dir) pour un type DCS.
 
@@ -526,6 +550,13 @@ def catalog(aircraft_type=None, lang="fr", root=None, saved=None):
                         rows.extend(_parse_commands_lua(f.read()))
                 except Exception:
                     pass
+                # profils hérités (F-14BU -> F-14-Pilot, etc.)
+                for inc in included_profiles(p, root):
+                    try:
+                        with open(inc, "r", encoding="utf-8", errors="ignore") as f:
+                            rows.extend(_parse_commands_lua(f.read()))
+                    except Exception:
+                        pass
             # 3) affectations du joueur : clavier puis HOTAS
             if saved:
                 ubase = os.path.join(saved, "Config", "Input")
@@ -690,7 +721,7 @@ def score_row(row, query, weights=None):
             term = " ".join(words[i:j])
             syn = SYNONYMS.get(term)
             if syn and any(t in text for t in syn):
-                s += 20
+                s += 34          # une locution française reconnue = signal fort
     for w in words:
         syn = SYNONYMS.get(w)
         if syn and any(t in text for t in syn):

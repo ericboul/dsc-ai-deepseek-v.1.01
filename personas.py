@@ -32,7 +32,8 @@ ROLES = {
     "instructor": {
         "label": "Instructeur / copilote (recommande)",
         "tools": ["get_telemetry", "press_control", "show_control", "list_controls",
-                  "autopilot", "highlight_cockpit_control", "clear_cockpit_highlight",
+                  "autopilot", "jester", "highlight_cockpit_control",
+                  "clear_cockpit_highlight",
                   "spawn_aircraft", "spawn_ground", "spawn_ship", "spawn_prefab",
                   "spawn_static", "battlefield_mark", "order_engage"],
         "brief": (
@@ -42,6 +43,8 @@ ROLES = {
             "press_control pour exécuter la commande à sa place (train, volets, "
             "aérofreins, crosse, perche, master arm, contre-mesures…), autopilot pour "
             "le pilote automatique, list_controls pour chercher une commande. "
+            "Sur F-14 tu pilotes aussi le menu Jester avec l'outil jester (open/close/"
+            "item/run/learn) : « va sur radar » -> tu ouvres le menu et tu choisis. "
             "Tu l'entraînes : démarrage, roulage, décollage, navigation, combat "
             "(radar, armement, contre-mesures), approche et atterrissage. "
             "Méthode d'instructeur : UNE étape à la fois, la touche affichée dans le "
@@ -54,7 +57,7 @@ ROLES = {
     "operator": {
         "label": "Opérateur / instructeur",
         "tools": ["get_telemetry", "press_control", "show_control", "list_controls",
-                  "autopilot", "spawn_aircraft", "spawn_ground", "spawn_ship",
+                  "autopilot", "jester", "spawn_aircraft", "spawn_ground", "spawn_ship",
                   "spawn_prefab", "spawn_static", "battlefield_mark", "order_engage",
                   "highlight_cockpit_control", "clear_cockpit_highlight"],
         "brief": ("opérateur de jeu et instructeur. Tu peux faire apparaître des "

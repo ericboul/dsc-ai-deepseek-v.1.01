@@ -10,6 +10,7 @@ Trois niveaux, du plus fiable au plus explicatif :
 Chaque action affiche la touche dans un carré à l'écran (overlay Windows) et
 la rappelle à l'écran de DCS.
 """
+import dcs_devices
 import dcs_keys
 import win_io
 
@@ -149,6 +150,17 @@ class CommandBridge:
                 pass
 
     @staticmethod
+    def _confident(row, query, aircraft, lang="fr", min_score=72):
+        """Un interrupteur cockpit n'est actionné que si la correspondance est
+        nette : cliquer à tort dans un cockpit est pire que ne rien faire."""
+        try:
+            rows = dcs_keys.catalog(aircraft, lang)
+            w = dcs_keys._weights(rows, (aircraft, lang))
+            return dcs_keys.score_row(row, query, w) >= min_score
+        except Exception:
+            return False
+
+    @staticmethod
     def combo(row):
         return dcs_keys.combo_label(row)
 
@@ -204,7 +216,31 @@ class CommandBridge:
                         "touche": self.combo(row), "via": "touche clavier"}
             return {"ok": False, "label": row.get("label"),
                     "touche": self.combo(row), "error": res.get("error")}
-        # 2) commande SIM (même sans touche liée)
+        # 2) commande DEVICE : interrupteur cockpit sans raccourci clavier
+        #    (pilote automatique F-14/F-18, menus Jester…). Numéros validés
+        #    contre les fichiers .diff.lua que DCS écrit lui-même.
+        if row and (row.get("device") or row.get("command")) and self.control:
+            try:
+                ids = dcs_devices.for_aircraft(ac)
+                trip = ids.resolve_row(row) if ids else None
+            except Exception:
+                trip = None
+            if trip and self._confident(row, query, ac, lang):
+                dev, cmd, val = trip
+                r = self.control.device_command(dev, cmd, val)
+                if r is None or not str(r).startswith("ERR"):
+                    self._show_box(self.combo(row) or "COCKPIT", row.get("label", ""),
+                                   seconds, "interrupteur cockpit (device %d)" % dev)
+                    return {"ok": True, "label": row.get("label"),
+                            "touche": self.combo(row),
+                            "via": "commande cockpit (%d/%d)" % (dev, cmd)}
+                device_error = str(r)
+            else:
+                device_error = None
+        else:
+            device_error = None
+
+        # 3) commande SIM (même sans touche liée)
         cmd = sim_for_query(query) or (sim_for_query(row.get("label") if row else "") if row else None)
         if cmd:
             if self.control and hasattr(self.control, "sim_command"):
@@ -228,7 +264,8 @@ class CommandBridge:
             return {"ok": False, "label": row.get("label"), "touche": combo,
                     "zone": row.get("category") or "",
                     "hotas": hotas,
-                    "error": ("commande sans raccourci clavier : interrupteur à "
+                    "error": ((device_error + " · ") if device_error else ""
+                              + "commande sans raccourci clavier : interrupteur à "
                               "cliquer en cockpit"
                               + (" (ou %s)" % hotas if hotas else "")
                               + " — pour que je puisse l'actionner, lie-la dans "
@@ -239,12 +276,32 @@ class CommandBridge:
                 "proches": [a.get("label") for a in alt]}
 
     # ---------------------------------------------------------------- autopilote
+    # requête de catalogue par mode (pour trouver l'interrupteur de l'appareil)
+    AP_QUERY = {
+        "alt_hold": ("maintien altitude", "altitude hold"),
+        "att_hold": ("maintien assiette", "attitude hold"),
+        "alt_bank": ("altitude roulis", "altitude bank"),
+        "level": ("vol en palier", "level flight"),
+        "alt_hdg": ("altitude cap", "altitude heading"),
+        "route": ("suivi de route", "route"),
+        "override": ("surcharge", "override"),
+        "off": ("debrayage", "disengage", "autopilot off", "autopilot toggle"),
+        "cancel": ("debrayage", "disengage", "autopilot off", "autopilot toggle",
+                   "autopilot disengage"),
+    }
+
     def autopilot(self, mode="alt_hold", lang="fr"):
         key = dcs_keys.norm(mode)
-        hit = AP_MODES.get(key)
+        hit = None
+        for k, v in AP_MODES.items():
+            nk = dcs_keys.norm(k)
+            if nk == key:
+                hit = v
+                break
         if not hit:
             for k, v in AP_MODES.items():
-                if k in key or key in k:
+                nk = dcs_keys.norm(k)
+                if nk and (nk in key or key in nk):
                     hit = v
                     break
         if not hit:
@@ -272,11 +329,55 @@ class CommandBridge:
             if res.get("ok"):
                 return {"ok": True, "label": row.get("label"),
                         "touche": self.combo(row), "via": "touche clavier"}
-        # 2) commande SIM
+        # 2) interrupteur cockpit de l'appareil (device + commande numériques).
+        #    On tente la formulation française PUIS anglaise : beaucoup de
+        #    modules (F-14) n'ont pas de libellé traduit.
+        mode_key = cmd[3:] if cmd.startswith("ap_") else cmd
+        variants = self.AP_QUERY.get(mode_key) or (key,)
+        if isinstance(variants, str):
+            variants = (variants,)
+        row2, query = None, (variants[0] if variants else key)
+        best = -1.0
+        try:
+            rows = dcs_keys.catalog(ac, lang)
+            w = dcs_keys._weights(rows, (ac, lang))
+        except Exception:
+            rows, w = [], None
+        for v in variants:
+            cand = dcs_keys.resolve(v, ac, lang)
+            if not cand:
+                continue
+            sc = dcs_keys.score_row(cand, v, w) if w else 0
+            if sc > best:
+                best, row2, query = sc, cand, v
+        if row2 and self.control:
+            try:
+                ids = dcs_devices.for_aircraft(ac)
+                trip = ids.resolve_row(row2) if ids else None
+            except Exception:
+                trip = None
+            if trip and self._confident(row2, query, ac, lang):
+                dev, cdev, val = trip
+                r = self.control.device_command(dev, cdev, val)
+                if r is None or not str(r).startswith("ERR"):
+                    self._show_box("PA", row2.get("label", label), 6,
+                                   "interrupteur cockpit")
+                    return {"ok": True, "label": row2.get("label"),
+                            "via": "commande cockpit (%d/%d)" % (dev, cdev)}
+
+        # 2 bis) aucun interrupteur crédible : ne pas envoyer une commande
+        # générique au hasard, dire la vérité sur ce que l'appareil propose.
+        if best < 45 and not (row and row.get("key")):
+            return {"ok": False, "label": label,
+                    "error": "ce mode de pilote automatique n'existe pas sur cet appareil",
+                    "disponibles": sorted({v[1] for v in AP_MODES.values()})}
+
+        # 3) commande SIM générique (selon l'appareil : peut ne rien faire)
         if self.control and hasattr(self.control, "sim_command"):
             r = self.control.sim_command(SIM[cmd])
             self._show_box("PA", label, 6, "envoyé à DCS")
             if r and str(r).startswith("ERR"):
                 return {"ok": False, "label": label, "error": str(r)}
-            return {"ok": True, "label": label, "via": "commande DCS"}
+            return {"ok": True, "label": label, "via": "commande DCS",
+                    "avertissement": "commande générique : vérifie l'annunciateur"}
         return {"ok": False, "label": label, "error": "canal DCS indisponible"}

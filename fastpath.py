@@ -96,6 +96,93 @@ def _ap_mode(text):
     return None
 
 
+JESTER_WORDS = ("jester", "iceman", "ice man", "menu jester", "menu iceman")
+
+
+_JESTER_CACHE = {}
+
+
+def has_jester_menu(aircraft):
+    """True si l'appareil a bien un menu Jester/Iceman (F-14)."""
+    if aircraft in _JESTER_CACHE:
+        return _JESTER_CACHE[aircraft]
+    ok = False
+    try:
+        row = dcs_keys.resolve("toggle menu", aircraft, "fr")
+        cat = dcs_keys.norm((row or {}).get("category", ""))
+        ok = bool(row) and ("jester" in cat or "iceman" in cat)
+    except Exception:
+        ok = False
+    _JESTER_CACHE[aircraft] = ok
+    return ok
+
+
+_STRIP = ("ouvre", "ouvrir", "affiche", "afficher", "montre", "ferme", "fermer",
+          "va", "vas", "sur", "passe", "choisis", "selectionne", "prends", "met",
+          "mets", "en", "mode", "le", "la", "les", "du", "de", "menu", "jester",
+          "iceman", "ice", "man", "numero", "entree", "item", "option")
+
+
+def _strip_words(t):
+    for w in _STRIP:
+        t = re.sub(r"(^|\s)" + re.escape(w) + r"(\s|$)", " ", t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def detect_jester(text, aircraft=None):
+    """Intentions liées au menu Jester / Iceman du F-14."""
+    t = dcs_keys.norm(text)
+    if not t:
+        return None
+    explicit = any(w in t for w in ("jester", "iceman", "ice man"))
+    if not explicit:
+        # hors mot « jester/iceman », seul « menu » + verbe explicite compte
+        if not ("menu" in t and any(v in t for v in
+                                    ("ouvre", "ouvrir", "ferme", "fermer", "affiche"))):
+            return None
+
+    # fermer
+    if any(v in t for v in ("ferme", "fermer", "quitte", "close")):
+        return {"action": "jester", "mode": "close", "query": text}
+
+    # choisir une entrée numérotée
+    m = re.search(r"(?:jester|iceman|entree|numero|option)?\s*([1-8])\b", t)
+    if m and not any(v in t for v in ("ouvre", "ouvrir", "affiche", "montre")):
+        # un numéro cité AVEC le mot jester = choix d'entrée
+        if len(re.findall(r"\b[1-8]\b", t)) and re.search(r"\b[1-8]\b", t):
+            return {"action": "jester", "mode": "item", "n": int(m.group(1)), "query": text}
+
+    # ouvrir (et éventuellement aller sur un sous-menu nommé)
+    rest = _strip_words(t)
+    if any(v in t for v in ("ouvre", "ouvrir", "affiche", "montre")):
+        if rest:
+            return {"action": "jester", "mode": "named", "name": rest, "query": text}
+        return {"action": "jester", "mode": "open", "query": text}
+
+    # « jester radar air air » / « va sur radar » -> nom
+    if rest:
+        return {"action": "jester", "mode": "named", "name": rest, "query": text}
+    return {"action": "jester", "mode": "open", "query": text}
+
+
+def detect_number(text):
+    """« trois », « 3 », « va sur 3 » -> 3 (menu Jester ouvert)."""
+    t = dcs_keys.norm(text)
+    for w in ("va", "vas", "sur", "passe", "choisis", "selectionne", "prends", "met",
+              "mets", "le", "la", "les", "l", "du", "de", "en", "mode", "option",
+              "item", "entree", "numero", "jester", "iceman"):
+        t = re.sub(r"(^|\s)" + re.escape(w) + r"(\s|$)", " ", t)
+    words = {"un": 1, "deux": 2, "trois": 3, "quatre": 4, "cinq": 5,
+             "six": 6, "sept": 7, "huit": 8}
+    t = re.sub(r"(^|\s)(numero|numéro|entree|entrée|l|le|la)(\s|$)", " ", t)
+    t = re.sub(r"\s+", " ", t).strip()
+    if t in words:
+        return words[t]
+    if re.fullmatch(r"[1-8]", t):
+        return int(t)
+    return None
+
+
 def detect(text, aircraft=None, lang="fr", min_score=55):
     """Analyse une phrase prononcée. Renvoie une intention, ou None si ce n'est
     pas une commande d'avion (à laisser au LLM)."""
@@ -106,11 +193,20 @@ def detect(text, aircraft=None, lang="fr", min_score=55):
     if not t:
         return None
 
+    # 0) menu Jester / Iceman (F-14) : à traiter avant les commandes
+    j = detect_jester(raw, aircraft)
+    if j:
+        return j
+
     # 1) autopilote (avant tout : « mets le pilote auto en maintien d'altitude »)
     if "pilote" in t or any(w.strip() in t for w in AP_WORDS):
         mode = _ap_mode(t)
         if mode:
             return {"action": "autopilot", "mode": mode, "query": raw}
+        if "pilote" in t or "autopilote" in t:
+            # pas de mode précisé : on demande plutôt que d'appuyer au hasard
+            # (sur le Hornet, « pilote automatique » seul = palette de coupure)
+            return {"action": "autopilot", "mode": None, "query": raw}
 
     # 2) intention : montrer ou exécuter
     show = _has(SHOW_VERBS, t)
@@ -171,6 +267,17 @@ def reply(intent, result):
     """Phrase brève de retour, style radio (pas de LLM)."""
     if not intent:
         return ""
+    if intent["action"] == "jester":
+        if result.get("demande_numero"):
+            return "Menu Jester ouvert, dis le numéro."
+        if intent.get("mode") == "open":
+            return "Menu Jester ouvert."
+        if intent.get("mode") == "close":
+            return "Menu Jester fermé."
+        if result.get("ok"):
+            lab = "Entrée %s" % intent.get("n") if intent.get("n") else (intent.get("name") or "Jester")
+            return "%s, fait." % lab
+        return "Jester : %s" % (result.get("error") or "échec")
     if intent["action"] == "autopilot":
         if result.get("ok"):
             return "%s, engagé." % short_label(result.get("label", "pilote auto"))

@@ -32,6 +32,8 @@ commandes cockpit exécutées · spawn & contrôle en jeu — sans mod lourd ni 
 | **Exécution réelle** | « sors le train » → Maj+G ; « active le master arm » → M ; « pilote auto maintien d'altitude », « palier », « débraye » → commandes DCS. |
 | **Chemin direct sans IA** | Les commandes avion sont reconnues de façon déterministe (≈0,2 s) : un modèle 4B local ne peut pas les casser. |
 | **IA locale sur NPU** | `flm serve qwen3.5:4b` (FastFlowLM) sur le NPU Ryzen AI, adresse `http://127.0.0.1:52625/v1` — aucune clé API, aucune donnée envoyée. |
+| **Interrupteurs sans raccourci** | Commande *device* envoyée à DCS (`performClickableAction`) : pilote automatique du F-14, commutateurs sans touche liée. Numéros validés contre les `.diff.lua` écrits par DCS (FA-18C 38/38, F-14BU 29/29). |
+| **Menu Jester (F-14)** | « ouvre le menu Jester », « jester 3 », « Jester radar » : il ouvre, choisit (Ctrl+1…8), referme et peut mémoriser tes chemins (`jester_menu.json`). |
 | **Rôle instructeur** | Démarrage, décollage, atterrissage, combat : une étape à la fois, touche affichée, valeur à tenir, correction brève. |
 | **Nouvelle interface** | Carte « Commandes de l'avion & carré des touches » : chercher, afficher, exécuter ; cases d'activation et durée du carré. |
 | **Nouveau nom & icône** | `DCS-RYZEN-Copilote.exe` (assistant + lanceur), raccourci Bureau « DCS RYZEN Copilote ». |

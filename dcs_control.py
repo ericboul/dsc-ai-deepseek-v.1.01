@@ -277,6 +277,21 @@ class DcsControl:
         """
         return self.export("LoSetCommand(%d, %s)" % (int(command), value))
 
+    def device_command(self, device_id, command, value=1.0):
+        """Actionne un interrupteur COCKPIT par ses numéros (device + commande).
+
+        C'est le seul moyen d'agir sur un commutateur qui n'a pas de raccourci
+        clavier (pilote automatique du F-14/F-18, menus Jester…). Exécuté dans
+        l'environnement EXPORT de DCS, via performClickableAction.
+        """
+        lua = ('local d = GetDevice(%d) '
+               'if d then '
+               'local ok, err = pcall(function() d:performClickableAction(%d, %s) end) '
+               'if ok then return "OK" end return "ERR " .. tostring(err) '
+               'end return "ERR device %d introuvable"' % (
+                   int(device_id), int(command), float(value), int(device_id)))
+        return self.export(lua)
+
     def key_banner(self, key_text, label, seconds=8):
         """Bandeau « ⌨ TOUCHE -> commande » à l'écran de DCS."""
         return self.out_text("%s   ->   %s" % (key_text, label), seconds)

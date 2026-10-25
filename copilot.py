@@ -25,6 +25,7 @@ import core
 import personas
 import ptt
 import fastpath
+import jester
 
 UDP_PORT    = 5010            # doit correspondre à dcs_claude_export.lua
 SAMPLE_RATE = 16000           # Whisper attend du 16 kHz mono
@@ -205,6 +206,8 @@ def run_copilot():
             injection=bool(c.get("key_injection", True)),
             display=bool(c.get("display_responses", True)))
 
+    jest = jester.Jester(bridge_now())
+    core.STATE["jester"] = jest
     core.STATE["overlay"] = ov
     core.STATE["bridge_factory"] = bridge_now
     if cfg0.get("dcs_install"):
@@ -455,6 +458,27 @@ def run_copilot():
             },
         },
         {
+            "name": "jester",
+            "description": (
+                "Pilote le menu Jester / Iceman du F-14 pour le pilote. "
+                "action=open (ouvre le menu), close (le ferme), item avec value=1..8 "
+                "(choisit l'entrée affichée), run avec value='radar' (ouvre et joue un "
+                "chemin appris), learn avec value='radar' et keys=[1,3] (mémorise le "
+                "chemin). Le menu est contextuel : si l'entrée est inconnue, ouvre-le et "
+                "demande le numéro au pilote."
+            ),
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string",
+                               "enum": ["open", "close", "item", "run", "learn", "list"]},
+                    "value": {"type": "string"},
+                    "keys": {"type": "array", "items": {"type": "integer"}},
+                },
+                "required": ["action"],
+            },
+        },
+        {
             "name": "autopilot",
             "description": (
                 "Règle l'autopilote : alt_hold (maintien d'altitude), att_hold "
@@ -592,6 +616,26 @@ def run_copilot():
             if ctrl and hasattr(ctrl, "remove_highlight"):
                 ctrl.remove_highlight()
             return {"ok": True}
+        if name == "jester":
+            j = core.STATE.get("jester")
+            if j is None:
+                return {"error": "Jester indisponible (canal DCS fermé)."}
+            a = tool_input or {}
+            act = (a.get("action") or "open").lower()
+            try:
+                if act == "open":
+                    return j.open()
+                if act == "close":
+                    return j.close()
+                if act == "item":
+                    return j.item(a.get("value") or a.get("n") or 0)
+                if act == "run":
+                    return j.run_named(a.get("value") or "")
+                if act == "learn":
+                    return j.learn(a.get("value") or "", a.get("keys") or [])
+                return j.known(a.get("value") or None)
+            except Exception as e:
+                return {"error": str(e)}
         if name in ("press_control", "show_control", "list_controls", "autopilot"):
             br = bridge_now()
             if br is None:
@@ -693,7 +737,17 @@ def run_copilot():
                     intent = None
                 if intent:
                     br = bridge_now()
-                    if intent["action"] == "autopilot":
+                    if intent["action"] == "jester":
+                        mode = intent.get("mode")
+                        if mode == "open":
+                            res = jest.open()
+                        elif mode == "close":
+                            res = jest.close()
+                        elif mode == "item":
+                            res = jest.item(intent.get("n") or 0)
+                        else:
+                            res = jest.run_named(intent.get("name") or "")
+                    elif intent["action"] == "autopilot":
                         res = br.autopilot(intent["mode"])
                     elif intent["action"] == "show":
                         res = br.show(intent["query"])
@@ -716,6 +770,23 @@ def run_copilot():
                         print(f"{cs}> {spoken}")
                         core.speak_as(persona.get("voice"), spoken)
                     continue
+
+            # Menu Jester ouvert : « trois » -> entrée 3 (le pilote lit l'écran)
+            try:
+                if jest.menu_open.get(current_aircraft()):
+                    n = fastpath.detect_number(msg)
+                    if n:
+                        res = jest.item(n)
+                        spoken = ("Entrée %d." % n) if res.get("ok") else \
+                                 ("Jester : %s" % (res.get("error") or "échec"))
+                        print(f"  [jester] entrée {n} -> ok={res.get('ok')}")
+                        core.STATE["status"] = {"heard": user_text, "error": "",
+                                                "rms": rms, "commande": "Jester %d" % n,
+                                                "touche": res.get("touche") or ""}
+                        core.speak_as(persona.get("voice"), spoken)
+                        continue
+            except Exception as e:
+                print(f"[jester] {e}")
 
             # Le cerveau (LLM) est interchangeable. On vide les historiques si on a
             # changé de fournisseur/modèle (formats d'historique incompatibles).
