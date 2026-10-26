@@ -52,6 +52,8 @@ MODEL_HINTS = {
     "custom": "",
 }
 BASE_HINTS = {
+    "flm": "http://127.0.0.1:52625/v1",
+    "lmstudio": "http://127.0.0.1:1234/v1",
     "deepseek": "https://api.deepseek.com/v1",
     "openai": "https://api.openai.com/v1",
     "anthropic": "",
@@ -385,7 +387,12 @@ class Wizard:
         else:
             self.model.set(MODEL_HINTS.get(pid, ""))
             self.base.set(BASE_HINTS.get(pid, ""))
-        self.key_entry.configure(state="disabled" if pid == "ollama" else "normal")
+        try:
+            import apikeys
+            keyless = not apikeys.needs_key(dict(self.cfg, llm_provider=pid))
+        except Exception:
+            keyless = pid in ("ollama", "flm", "lmstudio")
+        self.key_entry.configure(state="disabled" if keyless else "normal")
         self.key_state.configure(text=self._key_hint(pid))
 
     def list_models(self):
@@ -447,8 +454,10 @@ class Wizard:
 
     def _key_hint(self, pid=None):
         pid = pid or self._prov_id()
-        if pid == "ollama":
-            return "Aucune clé nécessaire : Ollama tourne en local."
+        if pid in ("ollama", "flm", "lmstudio"):
+            noms = {"ollama": "Ollama", "flm": "FastFlowLM (NPU Ryzen AI)",
+                    "lmstudio": "LM Studio"}
+            return "Aucune clé nécessaire : %s tourne en local." % noms[pid]
         if pid == "custom":
             return ("Personnalisé : URL de base (ex. https://api.mistral.ai/v1), "
                     "nom exact du modèle, puis la clé API.")
