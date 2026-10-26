@@ -162,7 +162,8 @@ Chaque persona répond avec **sa** voix et **sa** langue. Adresse-le par son **i
 - **Langue parlée** & **modèle** Whisper (`base`/`small`/`medium`…).
 - **Voix (TTS)** : moteur Piper/SAPI, **catalogue de voix téléchargeable** (54 langues), sortie casque.
 - **Radio en jeu (DCS‑SRS)** : optionnel, pour entendre le copilote sur une fréquence.
-- **Cerveau (IA)** : fournisseur (DeepSeek/OpenAI/Anthropic/Ollama), modèle, URL API, clé API.
+- **Cerveau (IA)** : fournisseur — **FastFlowLM (NPU local)**, **LM Studio**, DeepSeek, OpenAI,
+  Anthropic, Ollama, URL personnalisée —, modèle, URL API, clé API (aucune clé pour les serveurs locaux).
 
 ### 🔄 Réinitialiser / alléger
 `reset.bat` ramène le dossier à son **état minimal** (supprime clé, config, voix, librairies, Python,

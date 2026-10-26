@@ -183,6 +183,8 @@ $providers = @{
     "3" = @{ id = "anthropic"; label = "Anthropic Claude" }
     "4" = @{ id = "ollama";    label = "Ollama (100% local, aucune cle)" }
     "5" = @{ id = "custom";    label = "Autre API compatible OpenAI (Mistral, Groq, OpenRouter...)" }
+    "6" = @{ id = "flm";       label = "FastFlowLM - NPU local (flm serve qwen3.5:4b, aucune cle)" }
+    "7" = @{ id = "lmstudio";  label = "LM Studio - local (serveur 1234, aucune cle)" }
 }
 
 if ([string]::IsNullOrWhiteSpace($Provider)) {
@@ -191,18 +193,18 @@ if ([string]::IsNullOrWhiteSpace($Provider)) {
     } else {
         Line ""
         Line "  Choisis le fournisseur d'IA :"
-        foreach ($k in @("1","2","3","4","5")) { Line ("   " + $k + ") " + $providers[$k].label) }
+        foreach ($k in @("1","2","3","4","5","6","7")) { Line ("   " + $k + ") " + $providers[$k].label) }
         $c = Ask "Ton choix" "1"
         if ($providers.ContainsKey($c)) { $Provider = $providers[$c].id } else { $Provider = "deepseek" }
     }
 }
 $Provider = $Provider.ToLower()
-if (@("deepseek","openai","anthropic","ollama","custom") -notcontains $Provider) {
+if (@("deepseek","openai","anthropic","ollama","custom","flm","lmstudio") -notcontains $Provider) {
     Err ("fournisseur inconnu : " + $Provider); $Provider = "deepseek"
 }
 Ok ("fournisseur : " + $Provider)
 
-$needsKey = ($Provider -ne "ollama")
+$needsKey = (@("ollama","flm","lmstudio") -notcontains $Provider)
 if ($needsKey -and [string]::IsNullOrWhiteSpace($ApiKey)) {
     $existing = @{ deepseek = "deepseek_key.txt"; openai = "openai_key.txt"; anthropic = "apikey.txt"; custom = "openai_key.txt" }
     $ef = Join-Path $root $existing[$Provider]

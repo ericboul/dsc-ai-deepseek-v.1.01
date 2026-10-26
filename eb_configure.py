@@ -26,6 +26,8 @@ PROVIDERS = {
     "anthropic": {"model": "claude-sonnet-4-6",        "base": "",                            "label": "Anthropic"},
     "ollama":    {"model": "llama3.1",                 "base": "http://localhost:11434/v1",   "label": "Ollama (local)"},
     "custom":    {"model": "",                          "base": "",                            "label": "API compatible OpenAI"},
+    "flm":       {"model": "qwen3.5:4b",                "base": "http://127.0.0.1:52625/v1",   "label": "FastFlowLM (NPU local)"},
+    "lmstudio":  {"model": "",                          "base": "http://127.0.0.1:1234/v1",    "label": "LM Studio (local)"},
 }
 
 

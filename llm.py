@@ -89,6 +89,13 @@ class OpenAICompatClient:
             return (msg.get("content") or ""), convo
 
 
+# Serveurs LOCAUX sans clé : (URL par défaut, modèle par défaut)
+LOCAL_PRESETS = {
+    "flm": ("http://127.0.0.1:52625/v1", "qwen3.5:4b"),        # FastFlowLM, NPU Ryzen AI
+    "lmstudio": ("http://127.0.0.1:1234/v1", ""),               # LM Studio (GPU/CPU)
+}
+
+
 def client_key(cfg):
     """Identité du client (pour détecter un changement de fournisseur/modèle)."""
     return (cfg.get("llm_provider", "deepseek"),
@@ -98,6 +105,10 @@ def client_key(cfg):
 
 def make_client(cfg):
     prov = (cfg.get("llm_provider") or "deepseek").lower()
+    if prov in LOCAL_PRESETS:
+        base = cfg.get("llm_base_url") or LOCAL_PRESETS[prov][0]
+        model = cfg.get("llm_model") or LOCAL_PRESETS[prov][1] or "local-model"
+        return OpenAICompatClient(model, base, "")
     if prov == "anthropic":
         model = cfg.get("llm_model") or cfg.get("claude_model") or "claude-sonnet-4-6"
         return AnthropicClient(model)

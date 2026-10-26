@@ -30,7 +30,10 @@ CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 
 PROVIDERS = [
     # (id stocké dans config.json, libellé, URL de base, modèle par défaut)
-    ("deepseek", "DeepSeek (recommandé)", "", ""),
+    ("flm", "FastFlowLM — NPU local (flm serve qwen3.5:4b, sans clé)",
+     "http://127.0.0.1:52625/v1", "qwen3.5:4b"),
+    ("lmstudio", "LM Studio — local (sans clé)", "http://127.0.0.1:1234/v1", ""),
+    ("deepseek", "DeepSeek (cloud, clé API)", "", ""),
     ("openai", "OpenAI", "", ""),
     ("anthropic", "Anthropic (Claude)", "", ""),
     ("custom", "Personnalisé — URL + clé API", "", ""),
@@ -40,6 +43,8 @@ PROVIDERS = [
     ("ollama", "Ollama (local, sans clé)", "", ""),
 ]
 MODEL_HINTS = {
+    "flm": "qwen3.5:4b",
+    "lmstudio": "",
     "deepseek": "deepseek-chat",
     "openai": "gpt-4o-mini",
     "anthropic": "claude-sonnet-4-6",

@@ -1,5 +1,15 @@
 # Journal des versions
 
+## 2.0.1 — fournisseurs locaux & microphone
+
+- **Fournisseurs locaux dans l'interface** : « FastFlowLM — NPU local (flm serve) »
+  (URL `127.0.0.1:52625/v1`, modèle `qwen3.5:4b`) et « LM Studio — local » ; aucune clé
+  demandée, URL et modèle pré-remplis. Même choix dans `INSTALLER-TOUT` (options 6 et 7).
+- **Choix du microphone** : liste de tous les micros (WASAPI en priorité, MME en repli),
+  bouton « Rafraîchir la liste des micros », sélection enregistrée immédiatement, repli
+  automatique quand un casque Bluetooth refuse l'endpoint WASAPI.
+- Icône de l'application = badge « Le Lien Neural » ; logo affiché dans l'interface.
+
 ## 2.0 « RYZEN » — octobre 2026
 
 Version majeure : le copilote **agit** sur l'avion, montre les touches, pilote le menu

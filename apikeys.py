@@ -12,7 +12,12 @@ import os
 import dcs_config
 
 
+LOCAL_PROVIDERS = ("ollama", "flm", "lmstudio")
+
+
 def env_var(provider, cfg=None):
+    if provider in LOCAL_PROVIDERS:
+        return None
     if provider == "deepseek":
         return "DEEPSEEK_API_KEY"
     if provider == "anthropic":
@@ -23,6 +28,8 @@ def env_var(provider, cfg=None):
 
 
 def key_file(provider):
+    if provider in LOCAL_PROVIDERS:
+        return None
     if provider == "deepseek":
         return os.path.join(dcs_config.HERE, "deepseek_key.txt")
     if provider == "anthropic":
@@ -87,7 +94,7 @@ def is_local(cfg):
     """True si le cerveau tourne sur la machine (LM Studio, flm/NPU, Ollama)."""
     prov = (cfg.get("llm_provider") or "").lower()
     base = (cfg.get("llm_base_url") or "").lower()
-    if prov == "ollama":
+    if prov in LOCAL_PROVIDERS:
         return True
     return any(h in base for h in ("127.0.0.1", "localhost", "[::1]", "0.0.0.0"))
 
@@ -95,6 +102,6 @@ def is_local(cfg):
 def needs_key(cfg):
     """True si le fournisseur courant exige une clé et qu'aucune n'est disponible."""
     prov = cfg.get("llm_provider", "deepseek")
-    if prov == "ollama" or is_local(cfg):
+    if prov in LOCAL_PROVIDERS or is_local(cfg):
         return False          # un modèle local (NPU Ryzen AI, LM Studio) n'a pas de clé
     return not current_key(prov, cfg)

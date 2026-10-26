@@ -22,8 +22,10 @@
 2. Double-clique **`INSTALLER-TOUT.bat`**.
 3. Choisis le fournisseur d'IA :
    - `1` DeepSeek (cloud, clé sur <https://platform.deepseek.com/api_keys>) ;
-   - `2` OpenAI ; `3` Anthropic ; `4` URL personnalisée (LM Studio / NPU local) ;
-   - `5` Ollama (local, sans clé).
+   - `2` OpenAI ; `3` Anthropic ; `4` URL personnalisée (Mistral, Groq, OpenRouter…) ;
+   - `5` Ollama (local, sans clé) ;
+   - `6` **FastFlowLM — NPU local** (`flm serve qwen3.5:4b`, sans clé) ;
+   - `7` **LM Studio — local** (`127.0.0.1:1234`, sans clé).
 4. L'installateur met en place : Python embarqué, bibliothèques, Piper + 9 voix,
    modèle Whisper, pont Lua dans `Saved Games\DCS\Scripts`, raccourci Bureau.
 
@@ -44,10 +46,10 @@ Dans l'interface (`Cerveau (IA)`) :
 
 | Champ | Valeur |
 |---|---|
-| Fournisseur | **Personnalisé (URL + clé)** |
-| URL API | `http://127.0.0.1:52625/v1` |
-| Modèle | `qwen3.5:4b` |
-| Clé | *vide* (une adresse locale n'en demande pas) |
+| Fournisseur | **FastFlowLM — NPU local (flm serve)** |
+| URL API | `http://127.0.0.1:52625/v1` (pré-remplie) |
+| Modèle | `qwen3.5:4b` (pré-rempli, ou clique **Lister les modèles**) |
+| Clé | *aucune — ce fournisseur ne demande pas de clé* |
 
 Variante LM Studio : URL `http://127.0.0.1:1234/v1`, modèle = nom affiché dans LM Studio.
 

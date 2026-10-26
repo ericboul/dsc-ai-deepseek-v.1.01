@@ -228,7 +228,9 @@ PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
  <h2>🧠 Cerveau (IA)</h2>
  <div class=row style=margin-top:0>
    <label>Fournisseur <select id=llmProv style=width:auto>
-     <option value=deepseek>DeepSeek</option>
+     <option value=flm>FastFlowLM — NPU local (flm serve)</option>
+     <option value=lmstudio>LM Studio — local (GPU/CPU)</option>
+     <option value=deepseek>DeepSeek (cloud)</option>
      <option value=anthropic>Anthropic (Claude)</option>
      <option value=openai>OpenAI</option>
      <option value=custom>Personnalisé (URL + clé API)</option>
@@ -380,7 +382,19 @@ function wireLlm(){
   b.onchange=()=>{cfg.llm_base_url=b.value;save(true)};
   refreshKey();
 }
+const LOCAL_PROV={
+  flm:{base:'http://127.0.0.1:52625/v1',model:'qwen3.5:4b'},
+  lmstudio:{base:'http://127.0.0.1:1234/v1',model:''}
+};
 function applyProvDefaults(){
+  // serveurs locaux : URL + modèle pré-remplis (aucune clé demandée)
+  const lp=LOCAL_PROV[cfg.llm_provider];
+  if(lp){
+    const b=document.getElementById('llmBase'),m=document.getElementById('llmModel');
+    if(!(b.value||'').trim()){b.value=lp.base;cfg.llm_base_url=lp.base;save(true)}
+    if(!(m.value||'').trim()&&lp.model){m.value=lp.model;cfg.llm_model=lp.model;save(true)}
+    return;
+  }
   // passage en "Personnalisé" : on vide les valeurs DeepSeek pour laisser la place
   if(cfg.llm_provider!=='custom')return;
   const b=document.getElementById('llmBase'),m=document.getElementById('llmModel');
