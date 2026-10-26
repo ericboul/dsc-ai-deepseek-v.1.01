@@ -46,6 +46,7 @@ DEFAULTS = {
     "key_injection": True,        # le copilote peut appuyer sur les touches
     "key_overlay": True,          # carré de la touche affiché par-dessus DCS
     "key_overlay_seconds": 6,     # durée d'affichage du carré
+    "voice_volume": 1.4,          # volume de la voix du copilote (1.0 = normal, 2.0 = très fort)
     "aircraft_profile": "",       # force un profil DCS (ex. FA-18C) si télémétrie absente
     "dcs_install": "",            # racine de DCS World (sinon détection auto)
     "dcs_saved_games": "",        # dossier Saved Games\DCS (sinon détection auto)

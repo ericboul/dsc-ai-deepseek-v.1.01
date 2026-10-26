@@ -751,6 +751,12 @@ def run_copilot():
                             res = jest.item(intent.get("n") or 0)
                         else:
                             res = jest.run_named(intent.get("name") or "")
+                    elif intent["action"] == "volume":
+                        cur = float(core.get_config().get("voice_volume", 1.4) or 1.4)
+                        new = intent["value"] if intent.get("value") else cur + intent.get("delta", 0)
+                        new = max(0.3, min(2.5, round(new, 2)))
+                        core.update_config({"voice_volume": new})
+                        res = {"ok": True, "label": "volume de la voix", "volume": new}
                     elif intent["action"] == "autopilot":
                         res = br.autopilot(intent["mode"])
                     elif intent["action"] == "show":

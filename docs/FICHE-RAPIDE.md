@@ -90,3 +90,8 @@ outil `jester action=learn`). Ensuite « Jester radar » refait la séquence.
 - `jester_menu.json` — chemins Jester appris
 - `Saved Games\DCS\Scripts\Hooks\dcs_claude_control.lua` — pont avec la mission
 - `docs\DCS-RYZEN-COPILOTE.pdf` — dossier complet
+
+### Volume du copilote
+
+- Interface → carte **Sortie voix** → curseur **Volume de la voix** (50–200 %).
+- À la voix : « **plus fort** », « **moins fort** », « **volume 180** », « **volume normal** ».

@@ -103,8 +103,23 @@ def list_outputs():
             for i in range(outs.Count)]
 
 
+def apply_volume(audio, volume=1.0):
+    """Applique un gain à un signal float32 [-1, 1] (limitur dur au-delà de 1)."""
+    try:
+        v = float(volume)
+    except (TypeError, ValueError):
+        v = 1.0
+    v = max(0.05, min(3.0, v))
+    if abs(v - 1.0) < 0.01:
+        return audio
+    out = audio * v
+    np.clip(out, -1.0, 1.0, out=out)
+    return out
+
+
 class Speaker:
-    def __init__(self, voice_hint=None, output_hint=None):
+    def __init__(self, voice_hint=None, output_hint=None, volume=1.0):
+        self.volume = float(volume or 1.0)
         self._sp = win32com.client.Dispatch("SAPI.SpVoice")
         if voice_hint:
             voices = self._sp.GetVoices()
@@ -122,14 +137,17 @@ class Speaker:
                     break
 
     def say(self, text):
+        # SAPI : volume 0..100 seulement (pas d'amplification)
+        self._sp.Volume = int(max(0, min(100, round(self.volume * 100))))
         self._sp.Speak(text)
 
 
 class PiperSpeaker:
     """TTS neuronal local via Piper (piper.exe) — voix naturelle, CPU, GPU libre."""
-    def __init__(self, exe, model, output_name=None):
+    def __init__(self, exe, model, output_name=None, volume=1.0):
         self.exe = exe
         self.model = model
+        self.volume = float(volume or 1.0)
         with open(model + ".json", encoding="utf-8") as f:
             self.sr = json.load(f)["audio"]["sample_rate"]
         self.device = audioio.resolve_output_device(output_name)
@@ -144,6 +162,7 @@ class PiperSpeaker:
             raise RuntimeError((proc.stderr or b"").decode("utf-8", "ignore")[:200]
                                or "piper: pas de sortie audio")
         audio = np.frombuffer(proc.stdout, dtype=np.int16).astype(np.float32) / 32768.0
+        audio = apply_volume(audio, self.volume)
         sd.play(audio, samplerate=self.sr, device=self.device,
                 extra_settings=audioio.output_extra_settings(self.device))
         sd.wait()
@@ -151,10 +170,11 @@ class PiperSpeaker:
 
 def make_speaker(cfg):
     """Fabrique le lecteur TTS selon la config. Repli SAPI si Piper indisponible."""
+    vol = cfg.get("voice_volume", 1.0)
     if cfg.get("tts_engine") == "piper":
         exe = cfg.get("piper_exe_path")
         model = cfg.get("piper_model_path")
         if exe and model and os.path.isfile(exe) and os.path.isfile(model):
-            return PiperSpeaker(exe, model, cfg.get("tts_output_name"))
+            return PiperSpeaker(exe, model, cfg.get("tts_output_name"), volume=vol)
         print("[tts] Piper introuvable, repli sur la voix SAPI.")
-    return Speaker(cfg.get("tts_voice_hint"), cfg.get("tts_output_name"))
+    return Speaker(cfg.get("tts_voice_hint"), cfg.get("tts_output_name"), volume=vol)

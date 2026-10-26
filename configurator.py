@@ -155,6 +155,14 @@ PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
  <div class=row style=margin-top:4px><span id=voiceDlMsg class=msg></span></div>
  <div style=margin-top:10px>Périphérique de sortie :</div>
  <select id=ttsout></select>
+ <div class=row style=margin-top:10px>
+   <label style=flex:1>Volume de la voix
+     <input id=volRange type=range min=50 max=200 step=5 value=140
+            style=width:260px;vertical-align:middle oninput="onVolInput()"
+            onchange="onVolCommit()">
+     <span id=volLbl class=msg></span>
+   </label>
+ </div>
  <div class=row>
    <button class=ghost onclick=testVoice()>🔊 Tester la voix</button>
    <span id=voiceMsg class=msg></span>
@@ -302,6 +310,8 @@ async function load(){
   os.onchange=()=>{cfg.tts_output_name=os.value};
   const te=document.getElementById('ttsengine');te.value=cfg.tts_engine||'piper';
   te.onchange=()=>{cfg.tts_engine=te.value};
+  const vr=document.getElementById('volRange');
+  if(vr){ vr.value=volPct()||140; onVolInput(); }
   await loadVoices();
   // --- SRS ---
   document.querySelector('input[name=vmode][value='+(cfg.voice_mode||'headset')+']').checked=true;
@@ -532,6 +542,24 @@ async function testMic(){
   if(r.error){m.textContent='⚠ '+r.error;m.className='msg warn';return}
   m.innerHTML='Niveau : '+r.level_bar+'  —  Transcription : <span class=ok>“'+(r.text||'(rien)')+'”</span>';m.className='msg';
 }
+function volPct(){return Math.round((cfg.voice_volume||1)*100)}
+
+function onVolInput(){
+  const r=document.getElementById('volRange'),l=document.getElementById('volLbl');
+  const pct=parseInt(r.value);
+  cfg.voice_volume=pct/100;
+  l.textContent=pct+' %'+(pct>=180?' (fort)':'')+(pct<=80?' (discret)':'');
+  l.className='msg';
+}
+
+function onVolCommit(){
+  onVolInput();
+  save(true);
+  const l=document.getElementById('volLbl');
+  l.textContent=volPct()+' % — enregistré';
+  l.className='msg ok';
+}
+
 async function testVoice(){
   const m=document.getElementById('voiceMsg');m.textContent='🔊 Lecture…';m.className='msg warn';
   await save(true);   // applique le moteur/voix/sortie choisis avant de tester

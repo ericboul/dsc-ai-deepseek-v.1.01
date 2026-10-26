@@ -165,6 +165,27 @@ def detect_jester(text, aircraft=None):
     return {"action": "jester", "mode": "open", "query": text}
 
 
+_VOL_UP = ("plus fort", "monte le son", "monte le volume", "augmente le volume",
+           "augmente le son", "j entends rien", "on entend rien", "trop faible",
+           "pas assez fort", "parle plus fort")
+_VOL_DOWN = ("moins fort", "baisse le son", "baisse le volume", "reduis le volume",
+             "reduis le son", "trop fort", "parle moins fort", "moins de volume")
+
+
+def detect_volume(t, raw):
+    """« plus fort », « volume 160 », « volume normal » -> réglage de la voix."""
+    m = re.search(r"volume\s*(?:a\s*)?(\d{2,3})", t)
+    if m:
+        return {"action": "volume", "value": int(m.group(1)) / 100.0, "query": raw}
+    if "volume" in t and ("normal" in t or "defaut" in t or "d origine" in t):
+        return {"action": "volume", "value": 1.4, "query": raw}
+    if any(w in t for w in _VOL_UP):
+        return {"action": "volume", "delta": 0.2, "query": raw}
+    if any(w in t for w in _VOL_DOWN):
+        return {"action": "volume", "delta": -0.2, "query": raw}
+    return None
+
+
 def detect_number(text):
     """« trois », « 3 », « va sur 3 » -> 3 (menu Jester ouvert)."""
     t = dcs_keys.norm(text)
@@ -193,7 +214,12 @@ def detect(text, aircraft=None, lang="fr", min_score=55):
     if not t:
         return None
 
-    # 0) menu Jester / Iceman (F-14) : à traiter avant les commandes
+    # 0) confort audio : « plus fort », « volume 150 »
+    v = detect_volume(t, raw)
+    if v:
+        return v
+
+    # 0 bis) menu Jester / Iceman (F-14) : à traiter avant les commandes
     j = detect_jester(raw, aircraft)
     if j:
         return j
@@ -267,6 +293,9 @@ def reply(intent, result):
     """Phrase brève de retour, style radio (pas de LLM)."""
     if not intent:
         return ""
+    if intent["action"] == "volume":
+        pct = int(round(float(result.get("volume", 1.4)) * 100))
+        return f"Volume de la voix à {pct} pour cent."
     if intent["action"] == "jester":
         if result.get("demande_numero"):
             return "Menu Jester ouvert, dis le numéro."

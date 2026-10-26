@@ -111,6 +111,22 @@ c'est le persona actif qui répond. Chaque persona a sa langue et sa voix.
 
 ---
 
+## 7 bis. Volume de la voix (sans quitter le cockpit)
+
+| Phrase | Effet |
+|---|---|
+| « plus fort », « j'entends rien », « parle plus fort » | +20 % |
+| « moins fort », « baisse le son », « trop fort » | −20 % |
+| « volume 180 », « volume à 90 » | valeur exacte (30 % → 250 %) |
+| « volume normal » | retour à 140 % |
+
+Le même réglage existe dans l'interface : carte **4 · Sortie voix (TTS)** → curseur
+**Volume de la voix** (50–200 %), suivi de « Tester la voix ». Au-delà de 100 %, le
+signal est amplifié numériquement (plus fort que le maximum de Windows) avec un
+limiteur pour éviter la saturation.
+
+---
+
 ## 8. Ce qu'il ne fait pas
 
 - Il **ne clique pas** dans un cockpit sans numéros valides ni raccourci : dans ce cas il

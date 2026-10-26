@@ -68,7 +68,8 @@ def get_speaker():
     """(Re)construit le lecteur TTS si le moteur/voix/sortie a changé."""
     c = get_config()
     key = (c.get("tts_engine"), c.get("tts_voice_hint"), c.get("tts_output_name"),
-           c.get("piper_exe_path"), c.get("piper_model_path"))
+           c.get("piper_exe_path"), c.get("piper_model_path"),
+           round(float(c.get("voice_volume", 1.0) or 1.0), 2))
     if STATE["speaker_key"] != key:
         STATE["speaker"] = tts.make_speaker(c)
         STATE["speaker_key"] = key
@@ -88,13 +89,14 @@ def get_speaker_for(voice_path):
     c = get_config()
     cache = STATE.setdefault("speakers", {})
     out = c.get("tts_output_name")
-    key = (voice_path, out, c.get("piper_exe_path"))
+    vol = round(float(c.get("voice_volume", 1.0) or 1.0), 2)
+    key = (voice_path, out, c.get("piper_exe_path"), vol)
     if key not in cache:
         exe = c.get("piper_exe_path")
         if voice_path and os.path.isfile(voice_path) and exe and os.path.isfile(exe):
-            cache[key] = tts.PiperSpeaker(exe, voice_path, out)
+            cache[key] = tts.PiperSpeaker(exe, voice_path, out, volume=vol)
         else:
-            cache[key] = tts.Speaker(c.get("tts_voice_hint"), out)
+            cache[key] = tts.Speaker(c.get("tts_voice_hint"), out, volume=vol)
     return cache[key]
 
 
