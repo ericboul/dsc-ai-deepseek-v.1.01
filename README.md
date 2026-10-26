@@ -16,8 +16,13 @@ commandes cockpit exécutées · spawn & contrôle en jeu — sans mod lourd ni 
 
 *Projet **open source** sous licence MIT — code lisible, modifiable et redistribuable.*
 
-📄 **[Dossier de présentation (PDF)](docs/DCS-RYZEN-COPILOTE.pdf)** ·
-📖 **[Guide détaillé →](GUIDE.md)** · [Installation](#-installation) · [Nouveautés](#-nouveautés-version-20)
+📄 **[Dossier de présentation (PDF, 8 pages)](docs/DCS-RYZEN-COPILOTE.pdf)** ·
+⚡ **[Fiche rapide](docs/FICHE-RAPIDE.md)** ·
+🎙️ **[Commandes vocales](docs/COMMANDES-VOCALES.md)** ·
+🛠️ **[Installation](docs/INSTALLATION.md)** ·
+📝 **[Journal des versions](CHANGELOG.md)**
+
+📖 [Guide détaillé](GUIDE.md) · [LISEZ-MOI installation](LISEZ-MOI-EB.md)
 
 </div>
 
