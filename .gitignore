@@ -26,3 +26,6 @@ build_tmp/
 # Fichiers de travail (probes, rendus temporaires)
 _*.png
 _*.html
+
+# Video de presentation (a televerser sur YouTube)
+video/
