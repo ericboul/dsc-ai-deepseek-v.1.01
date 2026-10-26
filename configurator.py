@@ -404,8 +404,12 @@ function applyProvDefaults(){
 async function refreshKey(){
   const r=await j('/api/apikey?provider='+encodeURIComponent(cfg.llm_provider||'deepseek'));
   const row=document.getElementById('keyRow'),m=document.getElementById('keyMsg');
-  row.style.display=r.needs?'flex':'none';
-  if(!r.needs){return}
+  row.style.display=r.uses_key?'flex':'none';
+  if(!r.uses_key){
+    m.textContent='ℹ aucune clé nécessaire ('+(cfg.llm_provider||'local')+')';
+    m.className='msg';
+    return
+  }
   if((cfg.llm_provider||'')==='custom'&&!(cfg.llm_base_url||'').trim()){
     m.textContent="⚠ renseigne l’URL API et le nom du modèle avant de coller la clé";
     m.className='msg warn';return;
@@ -433,7 +437,9 @@ async function saveKey(){
   if(!key){m.textContent='Colle une clé.';m.className='msg';return}
   const r=await j('/api/apikey',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({provider:cfg.llm_provider||'deepseek',key})});
-  if(r.ok){inp.value='';m.textContent='✔ clé enregistrée : '+r.masked;m.className='msg ok'}
+  if(r.ok){inp.value='';
+    m.textContent=r.note?('ℹ '+r.note):('✔ clé enregistrée : '+r.masked);
+    m.className=r.note?'msg':'msg ok';refreshKey()}
   else{m.textContent='⚠ '+(r.error||'échec');m.className='msg warn'}
 }
 function wirePersonaOpts(){
@@ -622,11 +628,50 @@ def api_get_config():
     return jsonify(core.get_config())
 
 
+# URL / modèle attendus par fournisseur (évite qu'une URL locale restée en
+# mémoire fasse partir les appels DeepSeek vers le serveur NPU, et inversement)
+_PROV_DEFAULTS = {
+    "flm":       ("http://127.0.0.1:52625/v1", "qwen3.5:4b"),
+    "lmstudio":  ("http://127.0.0.1:1234/v1", ""),
+    "deepseek":  ("https://api.deepseek.com/v1", "deepseek-chat"),
+    "openai":    ("https://api.openai.com/v1", "gpt-4o-mini"),
+    "anthropic": ("", "claude-sonnet-4-6"),
+    "ollama":    ("http://localhost:11434/v1", ""),
+}
+
+
+def _normalize_llm(cfg, prev_provider=None):
+    """Recale URL/modèle quand le fournisseur change (sauf « custom »)."""
+    prov = (cfg.get("llm_provider") or "deepseek").lower()
+    if prov == "custom":
+        return
+    want_base, want_model = _PROV_DEFAULTS.get(prov, ("", ""))
+    changed = bool(prev_provider) and (prev_provider or "").lower() != prov
+    base = (cfg.get("llm_base_url") or "").strip()
+    if changed or not base:
+        cfg["llm_base_url"] = want_base
+    model = (cfg.get("llm_model") or "").strip()
+    if changed and want_model:
+        cfg["llm_model"] = want_model
+    elif not model and want_model:
+        cfg["llm_model"] = want_model
+
+
 @app.post("/api/config")
 def api_set_config():
-    data = request.get_json(force=True)
+    data = request.get_json(force=True) or {}
+    prev = (core.get_config().get("llm_provider") or "").lower()
     core.update_config(data)          # applique + persiste + réaligne le monitor
-    return jsonify({"ok": True})
+    cfg = core.get_config()
+    merged = dict(cfg)
+    _normalize_llm(merged, prev)
+    if (merged.get("llm_base_url") != cfg.get("llm_base_url")
+            or merged.get("llm_model") != cfg.get("llm_model")):
+        core.update_config({"llm_base_url": merged.get("llm_base_url", ""),
+                            "llm_model": merged.get("llm_model", "")})
+    return jsonify({"ok": True, "provider": core.get_config().get("llm_provider"),
+                    "base": core.get_config().get("llm_base_url"),
+                    "model": core.get_config().get("llm_model")})
 
 
 @app.get("/api/mics")
@@ -701,8 +746,16 @@ def api_get_key():
     cfg = core.get_config()
     prov = request.args.get("provider") or cfg.get("llm_provider", "deepseek")
     k = apikeys.current_key(prov, cfg)
-    return jsonify({"provider": prov, "present": bool(k),
-                    "masked": apikeys.masked(k), "needs": prov != "ollama"})
+    tmp = dict(cfg, llm_provider=prov)
+    present = bool(k)
+    # dépend du fournisseur DEMANDÉ, pas de l'URL restée en mémoire
+    uses_key = prov not in apikeys.LOCAL_PROVIDERS
+    if prov == "custom" and apikeys.is_local(tmp):
+        uses_key = False
+    return jsonify({"provider": prov, "present": present,
+                    "masked": apikeys.masked(k),
+                    "needs": uses_key and not present,   # clé absente alors qu'il en faut une
+                    "uses_key": uses_key})
 
 
 @app.post("/api/apikey")
@@ -712,6 +765,9 @@ def api_set_key():
     data = request.get_json(force=True) or {}
     prov = data.get("provider") or cfg.get("llm_provider", "deepseek")
     try:
+        if not apikeys.needs_key(dict(cfg, llm_provider=prov)):
+            return jsonify({"ok": True, "present": False, "masked": "",
+                            "note": "aucune clé nécessaire pour %s" % prov})
         apikeys.save_key(prov, data.get("key", ""), cfg)
         core.STATE["llm"] = None          # reconstruit le client avec la nouvelle clé
         core.STATE["llm_key"] = None

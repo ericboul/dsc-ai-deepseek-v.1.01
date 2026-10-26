@@ -17,11 +17,12 @@ import llm  # noqa: E402
 def main():
     cfg = dcs_config.load()
     prov = cfg.get("llm_provider", "deepseek")
-    if prov != "ollama":
-        key = apikeys.load_into_env(prov, cfg)
-        if not key:
-            print("ECHEC: aucune cle API pour %s." % prov)
-            return 1
+    key = apikeys.load_into_env(prov, cfg)
+    if apikeys.needs_key(cfg) and not key:
+        print("ECHEC: aucune cle API pour %s." % prov)
+        return 1
+    if not apikeys.needs_key(cfg):
+        print("fournisseur local (%s) : aucune cle requise" % prov)
     try:
         client = llm.make_client(cfg)
         text, _ = client.converse(

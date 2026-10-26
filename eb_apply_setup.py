@@ -64,7 +64,7 @@ def apply(patch):
     dcs_config.save(cfg)
 
     key = (patch.get("api_key") or "").strip()
-    if key and prov != "ollama":
+    if key and apikeys.needs_key(dict(cfg, llm_provider=prov)):
         apikeys.save_key(prov, key, cfg)
     return cfg
 
