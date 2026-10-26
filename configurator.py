@@ -65,7 +65,7 @@ PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
  .prow label{font-size:11px;color:var(--mut);display:flex;flex-direction:column;gap:3px}
  .prow input[type=text]{width:100px} .prow select{width:auto;padding:6px}
 </style></head><body>
-<h1>🎙️ DCS RYZEN Copilote — Configuration</h1>
+<h1 style="display:flex;align-items:center;gap:14px"><img src="/logo.png" alt="DCS RYZEN Copilote" style="width:64px;height:64px;border-radius:14px;border:1px solid var(--bd)"><span>DCS RYZEN Copilote — Configuration</span></h1>
 <p class=sub>Choisis ton push-to-talk et ton micro, puis teste. Enregistré dans <kbd>config.json</kbd>.</p>
 
 <div class=card style="max-width:920px">
@@ -110,6 +110,10 @@ PAGE = """<!doctype html><html lang=fr><head><meta charset=utf-8>
 <div class=card>
  <h2><span class=num>2</span> Microphone</h2>
  <select id=mic></select>
+ <div class=row>
+   <button class=ghost onclick=reloadMics()>🔄 Rafraîchir la liste des micros</button>
+   <span id=micCount class=msg></span>
+ </div>
  <div class=row>
    <button class=ghost onclick=testMic()>🎧 Tester le micro (parle 4 s)</button>
    <span id=micMsg class=msg></span>
@@ -275,11 +279,10 @@ async function load(){
   const sel=document.getElementById('mic');sel.innerHTML='';
   const def=document.createElement('option');def.value='';def.textContent='(Défaut système)';sel.appendChild(def);
   mics.forEach(m=>{const o=document.createElement('option');o.value=m.index;o.dataset.name=m.name;
-    o.textContent='#'+m.index+' — '+m.name+' ['+m.hostapi+']';
+    o.textContent=m.name+' ['+m.hostapi+']';
     if(cfg.mic_device_name===m.name||(!cfg.mic_device_name&&cfg.mic_device===m.index))o.selected=true;
     sel.appendChild(o)});
-  sel.onchange=()=>{cfg.mic_device=sel.value===''?null:parseInt(sel.value);
-    cfg.mic_device_name=sel.value===''?'':sel.options[sel.selectedIndex].dataset.name};
+  sel.onchange=micChanged;
   const ms=document.getElementById('model');ms.innerHTML='';
   ['base','small','medium','large-v3'].forEach(name=>{const o=document.createElement('option');
     o.value=name;o.textContent=name;if(cfg.whisper_model===name)o.selected=true;ms.appendChild(o)});
@@ -308,6 +311,33 @@ async function load(){
   sm.onchange=()=>{cfg.srs_modulation=sm.value};
   const sc=document.getElementById('srsCoal');sc.value=String(cfg.srs_coalition||2);
   sc.onchange=()=>{cfg.srs_coalition=parseInt(sc.value)};
+}
+function micChanged(){
+  const sel=document.getElementById('mic');
+  cfg.mic_device = sel.value==='' ? null : parseInt(sel.value);
+  cfg.mic_device_name = sel.value==='' ? '' : (sel.options[sel.selectedIndex].dataset.name||'');
+  save(true);                       // enregistre tout de suite : « Tester » utilise CE micro
+  const st=document.getElementById('micMsg');
+  if(st){st.textContent='micro sélectionné : '+(cfg.mic_device_name||'(défaut système)');}
+}
+
+async function reloadMics(){
+  const msg=document.getElementById('micCount');
+  msg.textContent='recherche…';
+  try{
+    let mics=await j('/api/mics?refresh=1');
+    if(!Array.isArray(mics)) mics=[];
+    if(!mics.length){ mics=await j('/api/mics'); }
+    const sel=document.getElementById('mic');
+    const keep=sel.value;
+    sel.innerHTML='';
+    const def=document.createElement('option');def.value='';def.textContent='(Défaut système)';sel.appendChild(def);
+    mics.forEach(m=>{const o=document.createElement('option');o.value=m.index;o.dataset.name=m.name;
+      o.textContent=m.name+' ['+m.hostapi+']'+(m.is_default?' · défaut':'');
+      if(String(m.index)===String(keep))o.selected=true;sel.appendChild(o)});
+    sel.onchange=micChanged;
+    msg.textContent=mics.length+' micro(s) détecté(s)'+(mics.length?'':' — vérifie le casque');
+  }catch(e){msg.textContent='erreur : '+e}
 }
 let _roles=[],_pvoices=[];
 async function renderPersonas(){
@@ -587,7 +617,12 @@ def api_set_config():
 
 @app.get("/api/mics")
 def api_mics():
-    return jsonify(audioio.list_input_devices())
+    """Micros détectés (toutes API). ?refresh=1 ré-énumère PortAudio."""
+    refresh = str(request.args.get("refresh", "")).lower() in ("1", "true", "yes")
+    try:
+        return jsonify(audioio.list_input_devices(refresh=refresh))
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.get("/api/status")
@@ -775,10 +810,14 @@ def api_test_callsign():
     sr, dur = 16000, 3.0
     try:
         dev = audioio.resolve_input_device(cfg.get("mic_device_name"), cfg.get("mic_device"))
-        audio = sd.rec(int(dur * sr), samplerate=sr, channels=1, dtype="float32",
-                       device=dev, extra_settings=audioio.input_extra_settings(dev))
-        sd.wait()
-        audio = audio.flatten()
+        stream, used = audioio.open_input_stream(device=dev, samplerate=sr, channels=1,
+                                                 name=cfg.get("mic_device_name"))
+        try:
+            data, _ = stream.read(int(dur * sr))
+        finally:
+            stream.stop()
+            stream.close()
+        audio = data.flatten()
     except Exception as e:
         return jsonify({"ok": False, "error": f"micro inutilisable : {e}"})
     try:
@@ -805,15 +844,20 @@ def api_test_mic():
     try:
         dev = audioio.resolve_input_device(cfg.get("mic_device_name"),
                                            cfg.get("mic_device"))
-        audio = sd.rec(int(dur * sr), samplerate=sr, channels=1,
-                       dtype="float32", device=dev,
-                       extra_settings=audioio.input_extra_settings(dev))
-        sd.wait()
-        audio = audio.flatten()
+        stream, used = audioio.open_input_stream(device=dev, samplerate=sr, channels=1,
+                                                 name=cfg.get("mic_device_name"))
+        try:
+            data, _ = stream.read(int(dur * sr))
+        finally:
+            stream.stop()
+            stream.close()
+        audio = data.flatten()
     except Exception as e:
         return jsonify({"error": f"micro inutilisable : {e}"})
 
     rms = float(np.sqrt(np.mean(audio ** 2))) if audio.size else 0.0
+    if not np.isfinite(rms):
+        rms = 0.0
     bars = min(20, int(rms * 400))
     level_bar = "█" * bars + "░" * (20 - bars)
 
@@ -828,6 +872,15 @@ def api_test_mic():
 # ---------------------------------------------------------------------------
 # Commandes de l'avion (catalogue, carré de touche, exécution)
 # ---------------------------------------------------------------------------
+@app.get("/logo.png")
+def logo_png():
+    """Le logo « Le Lien Neural » (badge) pour l'en-tête de l'interface."""
+    p = os.path.join(dcs_config.HERE, "eb_logo_neural_1024.png")
+    if os.path.exists(p):
+        return send_file(p, mimetype="image/png")
+    return ("", 404)
+
+
 @app.get("/api/commands_info")
 def api_commands_info():
     """Avion courant + taille du catalogue de commandes + état DCS."""

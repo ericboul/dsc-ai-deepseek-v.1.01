@@ -81,13 +81,17 @@ class TelemetryListener:
             return dict(self._latest) if self._latest else None
 
 
-def _record_active(monitor, device):
-    """Enregistre tant que `monitor` est pressé (sans attente initiale)."""
+def _record_active(monitor, device, name=None):
+    """Enregistre tant que `monitor` est pressé (sans attente initiale).
+
+    Passe par audioio.open_input_stream : si l'endpoint WASAPI refuse de
+    démarrer (casque Bluetooth), l'entrée MME du même micro est essayée.
+    """
     frames = []
-    stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1,
-                            dtype="float32", device=device,
-                            extra_settings=audioio.input_extra_settings(device))
-    stream.start()
+    stream, used = audioio.open_input_stream(device=device, samplerate=SAMPLE_RATE,
+                                             channels=1, name=name)
+    if used != device:
+        print(f"[micro] {name or device} : repli sur l'index {used}")
     while monitor.pressed:
         data, _ = stream.read(1024)
         frames.append(data.copy())
@@ -688,7 +692,7 @@ def run_copilot():
             print("\n[Maintiens un push-to-talk pour parler...]")
             ptt_pid, active_mon = _wait_any_ptt(monitor, persona_monitors)
             print("  ... écoute (relâche pour envoyer)")
-            audio = _record_active(active_mon, mic_device)
+            audio = _record_active(active_mon, mic_device, cfg.get("mic_device_name"))
             if audio.size < SAMPLE_RATE * 0.3:
                 print("  (rien capté : appui trop court ?)")
                 core.STATE["status"] = {"heard": "", "error": "appui trop court", "rms": 0.0}

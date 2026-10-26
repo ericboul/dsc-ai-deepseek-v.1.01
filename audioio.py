@@ -1,69 +1,162 @@
-"""Sélection et ouverture des micros - via WASAPI pour coller à la liste Windows.
+"""Sélection et ouverture des micros.
 
-PortAudio énumère chaque micro une fois par API (MME, DirectSound, WASAPI, WDM-KS)
-+ des entrées virtuelles. Windows n'affiche que les endpoints WASAPI actifs :
-on filtre donc sur WASAPI. Pour l'enregistrement, WASAPI en mode partagé exige la
-fréquence/canaux natifs -> on active l'auto-conversion (auto_convert=True) pour
-pouvoir capter directement en 16 kHz mono.
+PortAudio énumère chaque micro une fois par API (MME, DirectSound, WASAPI,
+WDM-KS). On expose TOUS les micros (avec leur API) en préférant WASAPI pour
+l'ouverture, et on peut ré-énumérer à chaud : un casque Bluetooth branché après
+le démarrage de l'application n'apparaît qu'après ré-initialisation de PortAudio.
 """
 import sounddevice as sd
 
+_API_ORDER = ("wasapi", "mme", "directsound", "wdm-ks")
 
-def _wasapi_hostapi_index():
-    for i, h in enumerate(sd.query_hostapis()):
-        if "WASAPI" in h["name"]:
+
+def refresh_devices():
+    """Ré-énumère les périphériques (indispensable après un branchement)."""
+    try:
+        sd._terminate()
+        sd._initialize()
+        return True
+    except Exception:
+        return False
+
+
+def _api_rank(name):
+    low = (name or "").lower()
+    for i, key in enumerate(_API_ORDER):
+        if key in low:
             return i
-    return None
+    return len(_API_ORDER)
 
 
-def list_input_devices():
-    """Micros actifs, filtrés WASAPI (comme la liste Windows), dédupliqués."""
-    wa = _wasapi_hostapi_index()
-    hostapis = sd.query_hostapis()
-    devices = sd.query_devices()
-    out, seen = [], set()
-    for i, d in enumerate(devices):
+# entrées « techniques » que Windows n'affiche pas comme des micros
+_SKIP = ("mappeur de sons", "sound mapper", "pilote de capture audio principal",
+         "primary sound capture", "haut-parleur", "speakers", "sortie",
+         "stereo input", "mixage stéréo")
+
+
+def _is_junk(name):
+    low = (name or "").lower()
+    return any(k in low for k in _SKIP)
+
+
+def _clean(name):
+    """Nom lisible : coupe les suffixes techniques des pilotes."""
+    n = (name or "").strip()
+    for marker in (" (@System32", "(@System32"):
+        if marker in n:
+            n = n.split(marker)[0]
+    return n.strip()
+
+
+def list_input_devices(refresh=False):
+    """Micros disponibles, toutes API confondues, dédupliqués par nom.
+
+    Chaque entrée : {"index", "name", "hostapi", "channels", "is_default"}.
+    L'index renvoyé est celui à passer à sounddevice (donc ouvrable tel quel).
+    """
+    has = sd.query_hostapis()
+    devs = sd.query_devices()
+    entries = []
+    for i, d in enumerate(devs):
         if d["max_input_channels"] <= 0:
             continue
-        if wa is not None and d["hostapi"] != wa:
+        name = _clean(d["name"])
+        if "loopback" in name.lower() or _is_junk(name):
             continue
-        name = d["name"]
-        if "loopback" in name.lower():
-            continue
-        key = name.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        out.append({"index": i, "name": name,
-                    "hostapi": hostapis[d["hostapi"]]["name"]})
-    # Repli si aucune entrée WASAPI (config exotique) : tout ce qui a une entrée.
-    if not out:
-        for i, d in enumerate(devices):
-            if d["max_input_channels"] > 0:
-                out.append({"index": i, "name": d["name"],
-                            "hostapi": hostapis[d["hostapi"]]["name"]})
+        if "WDM-KS" in has[d["hostapi"]]["name"]:
+            continue          # mode exclusif : échoue à l'ouverture, source de doublons
+        entries.append({
+            "index": i,
+            "name": name,
+            "hostapi": has[d["hostapi"]]["name"],
+            "channels": d["max_input_channels"],
+            "is_default": (i == sd.default.device[0]),
+        })
+
+    if refresh or len({e["name"] for e in entries}) < 2:
+        if refresh_devices():
+            has = sd.query_hostapis()
+            devs = sd.query_devices()
+            entries = []
+            for i, d in enumerate(devs):
+                nm = _clean(d["name"])
+                if d["max_input_channels"] <= 0 or "loopback" in nm.lower() or _is_junk(nm):
+                    continue
+                if "WDM-KS" in has[d["hostapi"]]["name"]:
+                    continue
+                entries.append({
+                    "index": i,
+                    "name": nm,
+                    "hostapi": has[d["hostapi"]]["name"],
+                    "channels": d["max_input_channels"],
+                    "is_default": (i == sd.default.device[0]),
+                })
+
+    # dédoublonnage par nom : on garde l'API la mieux classée (WASAPI d'abord)
+    best = {}
+    for e in entries:
+        key = e["name"].strip().lower()[:24]      # MME tronque les noms
+        cur = best.get(key)
+        if cur is None or _api_rank(e["hostapi"]) < _api_rank(cur["hostapi"]):
+            best[key] = e
+
+    out = list(best.values())
+    out.sort(key=lambda e: (_api_rank(e["hostapi"]), not e["is_default"], e["name"].lower()))
     return out
 
 
+def _match(name, devs):
+    if not name:
+        return None
+    for d in devs:
+        if d["name"] == name:
+            return d["index"]
+    low = name.strip().lower()
+    for d in devs:
+        n = d["name"].strip().lower()
+        if low in n or n in low:
+            return d["index"]
+    return None
+
+
+def _openable(index):
+    """L'index existe-t-il vraiment et accepte-t-il l'enregistrement ?"""
+    try:
+        d = sd.query_devices(index)
+        if d["max_input_channels"] <= 0:
+            return False
+        if "WDM-KS" in sd.query_hostapis()[d["hostapi"]]["name"]:
+            return False        # mode exclusif : échoue à l'ouverture
+        return True
+    except Exception:
+        return False
+
+
 def resolve_input_device(name, fallback_index=None):
-    """Retrouve l'index d'un micro par son nom (les index bougent si on
-    branche/débranche du matériel). Repli sur l'index mémorisé, sinon défaut."""
-    if name:
-        for d in list_input_devices():
-            if d["name"] == name:
-                return d["index"]
-    return fallback_index
+    """Index du micro choisi. On retrouve par NOM (les index changent quand on
+    branche un casque), et on ne fait confiance à l'index mémorisé que s'il
+    pointe encore sur un micro ouvrable : sinon -> micro par défaut."""
+    idx = _match(name, list_input_devices())
+    if idx is not None:
+        return idx
+    # le matériel a peut-être changé depuis le démarrage : on ré-énumère
+    idx = _match(name, list_input_devices(refresh=True))
+    if idx is not None:
+        return idx
+    if fallback_index is not None and _openable(fallback_index):
+        return fallback_index
+    return None
 
 
 def resolve_output_device(name):
     """Retrouve l'index d'un périphérique de SORTIE par son nom (WASAPI en priorité).
-    Match exact puis sous-chaîne (ex. 'Oculus' present des deux côtés). None = défaut."""
+    Match exact puis sous-chaîne. None = défaut."""
     if not name:
         return None
     devs = sd.query_devices()
     has = sd.query_hostapis()
     cands = [(i, d) for i, d in enumerate(devs) if d["max_output_channels"] > 0]
-    cands.sort(key=lambda x: 0 if "WASAPI" in has[x[1]["hostapi"]]["name"] else 1)
+    cands.sort(key=lambda x: _api_rank(has[x[1]["hostapi"]]["name"]))
     for i, d in cands:
         if d["name"] == name:
             return i
@@ -75,9 +168,56 @@ def resolve_output_device(name):
     return None
 
 
+def _candidates(name, index):
+    """Indices à essayer pour un micro : celui choisi, puis les mêmes endpoints
+    via une autre API (WASAPI Bluetooth qui refuse la synchro -> MME), puis défaut."""
+    out = []
+    if index is not None:
+        out.append(index)
+    if name:
+        low = name.strip().lower()
+        for i, d in enumerate(sd.query_devices()):
+            if d["max_input_channels"] <= 0:
+                continue
+            api = sd.query_hostapis()[d["hostapi"]]["name"]
+            if "WDM-KS" in api:
+                continue
+            n = _clean(d["name"]).strip().lower()
+            if n == low or n[:24] == low[:24]:
+                if i not in out:
+                    out.append(i)
+    out.append(None)          # micro par défaut du système
+    return out
+
+
+def open_input_stream(device=None, samplerate=16000, channels=1, name=None):
+    """Ouvre un flux d'entrée en essayant plusieurs API.
+
+    Renvoie (stream, index_utilisé). Lève la dernière erreur si tout échoue.
+    Indispensable pour les casques Bluetooth : leur endpoint WASAPI refuse
+    parfois la synchro (WdmSyncIoctl) alors que l'entrée MME fonctionne.
+    """
+    last = None
+    for idx in _candidates(name, device):
+        st = None
+        try:
+            st = sd.InputStream(samplerate=samplerate, channels=channels, dtype="float32",
+                                device=idx, extra_settings=input_extra_settings(idx))
+            st.start()
+            return st, idx
+        except Exception as e:
+            last = e
+            if st is not None:
+                try:
+                    st.close()
+                except Exception:
+                    pass
+    raise RuntimeError("aucun micro utilisable : %s" % last)
+
+
 def input_extra_settings(device):
-    """Renvoie les WasapiSettings(auto_convert) si le device est WASAPI, sinon None.
-    Valable pour l'entrée ET la sortie (conversion fréquence/canaux automatique)."""
+    """WasapiSettings(auto_convert) si le device est WASAPI, sinon None.
+    Valable pour l'entrée ET la sortie (conversion fréquence/canaux auto)."""
     if device is None:
         return None
     try:
