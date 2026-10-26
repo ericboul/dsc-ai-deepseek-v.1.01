@@ -95,7 +95,9 @@ def list_input_devices(refresh=False):
     # dédoublonnage par nom : on garde l'API la mieux classée (WASAPI d'abord)
     best = {}
     for e in entries:
-        key = e["name"].strip().lower()[:24]      # MME tronque les noms
+        # clé = 24 premiers caractères (MME tronque) + canaux : deux variantes
+        # réelles du même nom (« … (Communications) ») ne sont pas fusionnées.
+        key = (e["name"].strip().lower()[:24], e["channels"])
         cur = best.get(key)
         if cur is None or _api_rank(e["hostapi"]) < _api_rank(cur["hostapi"]):
             best[key] = e
